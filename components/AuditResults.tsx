@@ -286,6 +286,17 @@ interface LifecycleWaterfallProps {
 
 const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, consentTimestamp }) => {
   const [filter, setFilter] = useState<'all' | 'violations' | 'pre-consent'>('all');
+  
+  // View Transitions API support for smooth filter animations
+  const handleFilterChange = (newFilter: 'all' | 'violations' | 'pre-consent') => {
+    if (document.startViewTransition) {
+      document.startViewTransition(() => {
+        setFilter(newFilter);
+      });
+    } else {
+      setFilter(newFilter);
+    }
+  };
 
   const sortedRequests = useMemo(() => {
     return [...requests].sort((a, b) => a.timestamp - b.timestamp);
