@@ -11,10 +11,9 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
   const [url, setUrl] = useState('');
   const [scanCheck, setScanCheck] = useState(canUserScan());
   const [user, setUser] = useState<any>(null);
-  const [gridRows, setGridRows] = useState<string>('4rem auto auto 1fr');
   const isLoggedOut = !user;
   
-  const gridRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
   const messageRef = useRef<HTMLDivElement>(null);
 
@@ -29,17 +28,17 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
     setScanCheck(canUserScan());
   };
 
-  // Calculate perfect equal spacing using ResizeObserver
+  // Calculate perfect equal spacing using CSS Custom Properties
+  // This approach: Calculate spacing once, set CSS variables, CSS handles layout
   useLayoutEffect(() => {
-    if (!gridRef.current || !heroRef.current) return;
+    if (!containerRef.current || !heroRef.current) return;
 
     const calculateEqualSpacing = () => {
-      // Get actual grid container height (100dvh - accounts for browser chrome)
-      const gridHeight = gridRef.current!.offsetHeight;
+      // Get actual container height (100dvh - accounts for browser chrome)
+      const containerHeight = containerRef.current!.offsetHeight;
       
       // Constants
       const headerHeight = 64; // 4rem
-      const gap = 16; // 1rem (gap-4)
       
       // Get safe area insets
       const safeAreaBottom = parseInt(
@@ -48,49 +47,58 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
           .replace('px', '') || '0'
       ) || 0;
       
-      // Padding bottom = gap + safe area (ensures equal spacing to URL bar)
-      const paddingBottom = gap + safeAreaBottom;
-      
-      // Available height for content rows
-      const availableHeight = gridHeight - headerHeight - paddingBottom;
-      
       // Measure content heights
       const heroHeight = heroRef.current!.offsetHeight;
       const messageHeight = isLoggedOut && messageRef.current 
         ? messageRef.current.offsetHeight 
         : 0;
       
+      // Available space = container - header - safe area bottom
+      const availableHeight = containerHeight - headerHeight - safeAreaBottom;
+      
+      // Calculate equal spacing
+      // We need: gap1 (after header), gap2 (after hero), gap3 (after message if logged out), padding-bottom
+      // All gaps should be equal
       if (isLoggedOut) {
-        // Logged out: 4 rows (spacer, hero, message, scan)
-        // 3 gaps total
+        // Logged out: header + gap1 + hero + gap2 + message + gap3 + scan + padding-bottom
+        // Total content: hero + message
+        // Number of gaps: 3 (gap1, gap2, gap3) + 1 (padding-bottom) = 4 equal spaces
         const totalContentHeight = heroHeight + messageHeight;
-        const totalGaps = 3 * gap;
-        const scanCardHeight = availableHeight - totalContentHeight - totalGaps;
+        const totalSpacing = availableHeight - totalContentHeight;
+        const equalSpacing = totalSpacing / 4; // 4 equal spaces
         
-        if (scanCardHeight > 100) {
-          setGridRows(`4rem ${heroHeight}px ${messageHeight}px ${scanCardHeight}px`);
-        }
+        // Set CSS custom properties
+        containerRef.current!.style.setProperty('--spacing-top', `${equalSpacing}px`);
+        containerRef.current!.style.setProperty('--spacing-middle', `${equalSpacing}px`);
+        containerRef.current!.style.setProperty('--spacing-bottom', `${equalSpacing}px`);
+        containerRef.current!.style.setProperty('--spacing-padding', `${equalSpacing + safeAreaBottom}px`);
       } else {
-        // Logged in: 3 rows (spacer, hero, scan)
-        // 2 gaps total
-        const totalGaps = 2 * gap;
-        const scanCardHeight = availableHeight - heroHeight - totalGaps;
+        // Logged in: header + gap1 + hero + gap2 + scan + padding-bottom
+        // Total content: hero
+        // Number of gaps: 2 (gap1, gap2) + 1 (padding-bottom) = 3 equal spaces
+        const totalContentHeight = heroHeight;
+        const totalSpacing = availableHeight - totalContentHeight;
+        const equalSpacing = totalSpacing / 3; // 3 equal spaces
         
-        if (scanCardHeight > 100) {
-          setGridRows(`4rem ${heroHeight}px ${scanCardHeight}px`);
-        }
+        // Set CSS custom properties
+        containerRef.current!.style.setProperty('--spacing-top', `${equalSpacing}px`);
+        containerRef.current!.style.setProperty('--spacing-middle', `${equalSpacing}px`);
+        containerRef.current!.style.setProperty('--spacing-bottom', `${equalSpacing}px`);
+        containerRef.current!.style.setProperty('--spacing-padding', `${equalSpacing + safeAreaBottom}px`);
       }
     };
 
-    // Initial calculation
-    const timeoutId = setTimeout(calculateEqualSpacing, 100);
+    // Initial calculation with delays to ensure content is rendered
+    const timeout1 = setTimeout(calculateEqualSpacing, 50);
+    const timeout2 = setTimeout(calculateEqualSpacing, 150);
+    const timeout3 = setTimeout(calculateEqualSpacing, 300);
 
     // Use ResizeObserver to recalculate when content changes
     const resizeObserver = new ResizeObserver(() => {
       calculateEqualSpacing();
     });
 
-    if (gridRef.current) resizeObserver.observe(gridRef.current);
+    if (containerRef.current) resizeObserver.observe(containerRef.current);
     if (heroRef.current) resizeObserver.observe(heroRef.current);
     if (messageRef.current) resizeObserver.observe(messageRef.current);
 
@@ -102,7 +110,9 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
     window.addEventListener('orientationchange', handleOrientationChange);
 
     return () => {
-      clearTimeout(timeoutId);
+      clearTimeout(timeout1);
+      clearTimeout(timeout2);
+      clearTimeout(timeout3);
       resizeObserver.disconnect();
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('orientationchange', handleOrientationChange);
@@ -154,21 +164,26 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
 
   return (
     <div className="h-full w-full">
-      {/* Mobile: CSS Grid with calculated equal spacing for perfect symmetry */}
-      {/* Uses ResizeObserver to recalculate when content changes */}
+      {/* Mobile: Flexbox with CSS Custom Properties for perfect equal spacing */}
+      {/* JavaScript calculates spacing, CSS variables control layout */}
       <div 
-        ref={gridRef}
-        className="h-[100dvh] grid gap-4 sm:gap-6 lg:gap-8 max-w-5xl mx-auto px-4 sm:px-6 lg:px-4"
+        ref={containerRef}
+        className="h-[100dvh] flex flex-col max-w-5xl mx-auto px-4 sm:px-6 lg:px-4"
         style={{
-          gridTemplateRows: gridRows,
-          paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))',
+          paddingBottom: 'var(--spacing-padding, 1rem)',
         }}
       >
-        {/* Row 1: Empty spacer for header height (4rem) */}
-        <div></div>
+        {/* Header spacer (4rem) */}
+        <div className="h-16 flex-shrink-0"></div>
         
-        {/* Row 2: Hero Section */}
-        <div ref={heroRef} className="text-center flex-shrink-0">
+        {/* Hero Section */}
+        <div 
+          ref={heroRef} 
+          className="text-center flex-shrink-0"
+          style={{
+            marginTop: 'var(--spacing-top, 1rem)',
+          }}
+        >
           <h1 className="text-2xl sm:text-3xl lg:text-5xl xl:text-6xl font-black text-slate-900 tracking-tight mb-2 sm:mb-4 lg:mb-6 leading-tight">
             GDPR Compliance Testing
             <span className="block text-blue-600 mt-1 sm:mt-3 lg:mt-4">for Privacy Professionals</span>
@@ -204,9 +219,15 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
           </div>
         </div>
 
-        {/* Row 3: Login Message (only when logged out) */}
+        {/* Login Message (only when logged out) */}
         {isLoggedOut && (
-          <div ref={messageRef} className="bg-blue-50 border border-blue-200 rounded-xl p-3 sm:p-5 flex-shrink-0">
+          <div 
+            ref={messageRef} 
+            className="bg-blue-50 border border-blue-200 rounded-xl p-3 sm:p-5 flex-shrink-0"
+            style={{
+              marginTop: 'var(--spacing-middle, 1rem)',
+            }}
+          >
             <p className="text-sm sm:text-base text-blue-800 flex items-start sm:items-center">
               <svg className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5 sm:mt-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
