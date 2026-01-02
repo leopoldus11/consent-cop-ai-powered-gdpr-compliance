@@ -69,21 +69,58 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50 safe-area-top">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            {/* Logo */}
+            {/* Desktop: Logo on left */}
             <button 
               onClick={() => {
                 onPageChange('home');
                 setShowMobileMenu(false);
               }} 
-              className="flex items-center space-x-2 sm:space-x-3 hover:opacity-80 transition-opacity flex-shrink-0"
+              className="hidden lg:flex items-center space-x-3 hover:opacity-80 transition-opacity flex-shrink-0"
             >
-              <div className="bg-blue-600 p-1.5 sm:p-2 rounded-lg">
-                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="bg-blue-600 p-2 rounded-lg">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
               </div>
-              <span className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">CONSENT COP</span>
+              <span className="text-xl font-bold text-slate-900 tracking-tight">CONSENT COP</span>
             </button>
+
+            {/* Mobile: Hamburger and Logo on left */}
+            <div className="lg:hidden flex items-center space-x-3">
+              <button
+                onClick={() => {
+                  if ('startViewTransition' in document) {
+                    (document as any).startViewTransition(() => {
+                      setShowMobileMenu(!showMobileMenu);
+                    });
+                  } else {
+                    setShowMobileMenu(!showMobileMenu);
+                  }
+                }}
+                className="p-2 text-slate-600 hover:text-blue-600 transition-colors relative w-10 h-10 flex items-center justify-center z-50"
+                aria-label="Toggle menu"
+              >
+                <div className="relative w-6 h-6">
+                  {/* Static two lines - no animation */}
+                  <span className="absolute top-1.5 left-0 w-6 h-0.5 bg-current"></span>
+                  <span className="absolute top-4 left-0 w-6 h-0.5 bg-current"></span>
+                </div>
+              </button>
+              <button 
+                onClick={() => {
+                  onPageChange('home');
+                  setShowMobileMenu(false);
+                }} 
+                className="flex items-center space-x-2 hover:opacity-80 transition-opacity flex-shrink-0"
+              >
+                <div className="bg-blue-600 p-1.5 rounded-lg">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </div>
+                <span className="text-lg font-bold text-slate-900 tracking-tight">CONSENT COP</span>
+              </button>
+            </div>
             
             {/* Desktop Navigation */}
             <nav className="hidden lg:flex items-center space-x-6">
@@ -130,11 +167,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
               )}
             </nav>
 
-            {/* Mobile: Right side actions */}
-            <div className="flex lg:hidden items-center space-x-2">
+            {/* Mobile: Right side - Sign in button or profile */}
+            <div className="flex lg:hidden items-center space-x-3">
               {user && (
-                <div className="flex items-center bg-amber-50 px-2 py-1 rounded-full border border-amber-200" title={scanCheck.reason || 'Weekly scan allowance'}>
-                  <span className="text-amber-700 text-[9px] font-black uppercase tracking-wider">
+                <div className="flex items-center bg-amber-50 px-3 py-1.5 rounded-full border border-amber-200" title={scanCheck.reason || 'Weekly scan allowance'}>
+                  <span className="text-amber-700 text-xs sm:text-sm font-black uppercase tracking-wider">
                     {scanCheck.scansRemaining}/5
                   </span>
                 </div>
@@ -156,28 +193,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
               ) : (
                 <LoginButton onLoginSuccess={handleLoginSuccess} />
               )}
-
-              {/* Mobile Menu Button with 2-line Animation (always visible) */}
-              <button
-                onClick={() => {
-                  // Use View Transition API if available for smooth transition
-                  if ('startViewTransition' in document) {
-                    (document as any).startViewTransition(() => {
-                      setShowMobileMenu(!showMobileMenu);
-                    });
-                  } else {
-                    setShowMobileMenu(!showMobileMenu);
-                  }
-                }}
-                className="p-2 text-slate-600 hover:text-blue-600 transition-colors relative w-10 h-10 flex items-center justify-center z-50"
-                aria-label="Toggle menu"
-              >
-                <div className="relative w-6 h-6">
-                  {/* Two lines that animate to X */}
-                  <span className={`absolute top-1.5 left-0 w-6 h-0.5 bg-current transition-all duration-300 ease-out ${showMobileMenu ? 'rotate-45 top-2.5' : ''}`}></span>
-                  <span className={`absolute top-4 left-0 w-6 h-0.5 bg-current transition-all duration-300 ease-out ${showMobileMenu ? '-rotate-45 top-2.5' : ''}`}></span>
-                </div>
-              </button>
             </div>
           </div>
         </div>
@@ -204,12 +219,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
             showMobileMenu ? 'opacity-100' : 'opacity-0'
           }`}></div>
           
-          {/* Menu Panel - Slides down from top */}
+          {/* Menu Panel - Slides from left to right */}
           <div 
-            className={`absolute top-0 left-0 right-0 bg-white shadow-2xl transform transition-all duration-300 ease-out ${
+            className={`absolute top-0 left-0 bottom-0 w-80 max-w-[85vw] bg-white shadow-2xl transform transition-all duration-300 ease-out ${
               showMobileMenu 
-                ? 'translate-y-0 opacity-100' 
-                : '-translate-y-full opacity-0'
+                ? 'translate-x-0 opacity-100' 
+                : '-translate-x-full opacity-0'
             }`}
             style={{
               maxHeight: '100vh',
@@ -217,8 +232,22 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Menu Header with close button */}
-            <div className="sticky top-0 bg-white border-b border-slate-200 px-4 py-4 flex items-center justify-end z-10">
+            {/* Menu Header with Consent Cop logo and close button */}
+            <div className="sticky top-0 bg-white border-b border-slate-200 px-4 py-4 flex items-center justify-between z-10">
+              <button 
+                onClick={() => {
+                  onPageChange('home');
+                  setShowMobileMenu(false);
+                }} 
+                className="flex items-center space-x-2 hover:opacity-80 transition-opacity"
+              >
+                <div className="bg-blue-600 p-1.5 rounded-lg">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </div>
+                <span className="text-lg font-bold text-slate-900 tracking-tight">CONSENT COP</span>
+              </button>
               <button
                 onClick={() => {
                   if ('startViewTransition' in document) {
@@ -229,11 +258,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                     setShowMobileMenu(false);
                   }
                 }}
-                className="p-2 -mr-2 text-slate-400 hover:text-slate-600 active:text-slate-900 transition-colors rounded-full hover:bg-slate-100 active:bg-slate-200"
+                className="p-2 -mr-2 text-slate-500 hover:text-slate-700 active:text-slate-900 transition-colors rounded-full hover:bg-slate-100 active:bg-slate-200"
                 aria-label="Close menu"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                {/* Back arrow instead of X - more intuitive for side menu */}
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
             </div>
