@@ -231,15 +231,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
           
           {/* Menu Panel - Slides from left to right */}
           <div 
-            className={`absolute top-0 left-0 bottom-0 w-80 max-w-[85vw] bg-white shadow-2xl transform transition-all duration-300 ease-out ${
+            className={`absolute top-0 left-0 bottom-0 w-80 max-w-[85vw] bg-white shadow-2xl transform transition-transform duration-300 ease-out ${
               showMobileMenu 
-                ? 'translate-x-0 opacity-100' 
-                : '-translate-x-full opacity-0'
+                ? 'translate-x-0' 
+                : '-translate-x-full'
             }`}
             style={{
               maxHeight: '100vh',
               overflowY: 'auto',
-              viewTransitionName: showMobileMenu ? 'mobile-menu' : undefined,
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -331,7 +330,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
       </main>
 
       {/* Mobile Profile Context Menu - Slides from right to left */}
-      {showProfileModal && user && (
+      {user && (
         <div 
           className={`lg:hidden fixed inset-0 z-[100] transition-all duration-300 ease-out ${
             showProfileModal 
@@ -349,21 +348,20 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
           }}
         >
           {/* Backdrop with blur */}
-          <div className={`absolute inset-0 bg-slate-900/70 backdrop-blur-md transition-all duration-300 ${
+          <div className={`absolute inset-0 bg-slate-900/70 backdrop-blur-md transition-all duration-300 ease-out ${
             showProfileModal ? 'opacity-100' : 'opacity-0'
           }`}></div>
           
           {/* Context Menu Panel - Slides from right to left */}
           <div 
-            className={`absolute top-0 right-0 bottom-0 w-80 max-w-[85vw] bg-white shadow-2xl transform transition-all duration-300 ease-out ${
+            className={`absolute top-0 right-0 bottom-0 w-80 max-w-[85vw] bg-white shadow-2xl transform transition-transform duration-300 ease-out ${
               showProfileModal 
-                ? 'translate-x-0 opacity-100' 
-                : 'translate-x-full opacity-0'
+                ? 'translate-x-0' 
+                : 'translate-x-full'
             }`}
             style={{
               maxHeight: '100vh',
               overflowY: 'auto',
-              viewTransitionName: showProfileModal ? 'profile-menu' : undefined,
             }}
             onClick={(e) => e.stopPropagation()}
           >
