@@ -1,0 +1,128 @@
+# Critical sections that need refactoring in scanner.ts
+
+## Section 1: Browser Launch (lines 72-150)
+Replace Puppeteer launch with Playwright:
+
+```typescript
+let browser: Browser | null = null;
+let context: BrowserContext | null = null;
+let inPageMonitor: { getRequests: () => InPageRequest[]; cleanup: () => void } | null = null;
+
+try {
+  // PRE-FLIGHT: Check bot detection
+  if (!options?.skipBotCheck) {
+    console.log('[ANTI-BOT] Running pre-flight bot detection check...');
+    const botCheck = await checkBotDetection();
+    console.log(`[ANTI-BOT] Bot detection check: detected=${botCheck.detected}, score=${botCheck.score}`);
+  }
+  
+  // Launch Playwright browser
+  browser = await chromium.launch({
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-blink-features=AutomationControlled',
+    ],
+  });
+  
+  // Create context with realistic fingerprint
+  const proxy = getNextProxy(options?.proxyPool);
+  context = await browser.newContext({
+    viewport: { width: 1920, height: 1080 },
+    userAgent: getRealisticUserAgent(),
+    locale: 'en-US',
+    timezoneId: 'America/New_York',
+    extraHTTPHeaders: getRealisticHeaders(),
+    proxy: proxy ? {
+      server: `http://${proxy.host}:${proxy.port}`,
+      username: proxy.username,
+      password: proxy.password,
+    } : undefined,
+  });
+  
+  const page = await context.newPage();
+  
+  // Remove automation indicators
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => false });
+    (window as any).chrome = { runtime: {} };
+  });
+  
+  // Set up in-page network monitoring
+  inPageMonitor = await setupInPageNetworkMonitor(page);
+  
+  // Set up request listeners (Playwright doesn't need interception)
+  const allRequests: NetworkRequest[] = [];
+  page.on('request', (request) => {
+    const networkRequest: NetworkRequest = {
+      url: request.url(),
+      method: request.method(),
+      headers: request.headers(),
+      postData: request.postData() || undefined,
+      timestamp: Date.now(),
+      resourceType: request.resourceType(),
+    };
+    allRequests.push(networkRequest);
+  });
+```
+
+## Section 2: Screenshots (lines 202-271)
+Replace Puppeteer screenshot API:
+
+```typescript
+// BEFORE consent
+const screenshotBefore = (await page.screenshot({ 
+  type: 'png',
+  fullPage: false 
+})) as Buffer;
+const screenshotBeforeBase64 = screenshotBefore.toString('base64');
+
+// AFTER consent
+const screenshotAfter = (await page.screenshot({ 
+  type: 'png',
+  fullPage: false 
+})) as Buffer;
+const screenshotAfterBase64 = screenshotAfter.toString('base64');
+```
+
+## Section 3: Navigation (lines 153-170)
+Replace Puppeteer navigation:
+
+```typescript
+await page.goto(targetUrl, {
+  waitUntil: 'networkidle', // Not 'networkidle0' or 'networkidle2'
+  timeout: 60000,
+});
+```
+
+## Section 4: Element Selection (lines 796-810)
+Replace Puppeteer element APIs:
+
+```typescript
+const button = page.locator(selector).first();
+const isVisible = await button.isVisible().catch(() => false);
+if (isVisible) {
+  await button.click({ timeout: 2000 });
+}
+```
+
+## Section 5: Cleanup (lines 549-557)
+Add context cleanup:
+
+```typescript
+finally {
+  if (inPageMonitor) {
+    inPageMonitor.cleanup();
+  }
+  if (context) {
+    await context.close();
+  }
+  if (browser) {
+    await browser.close();
+  }
+}
+```
+
+

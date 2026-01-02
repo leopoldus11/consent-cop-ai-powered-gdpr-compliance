@@ -2,7 +2,10 @@
 
 import { ScanResult } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Use Vercel API URL if deployed, otherwise use configured URL or localhost
+const API_BASE_URL = import.meta.env.VITE_API_URL || 
+  (typeof window !== 'undefined' && window.location.origin) || 
+  'http://localhost:3001';
 
 export async function realScan(url: string): Promise<ScanResult> {
   const response = await fetch(`${API_BASE_URL}/api/scan`, {
@@ -20,4 +23,5 @@ export async function realScan(url: string): Promise<ScanResult> {
 
   return response.json();
 }
+
 

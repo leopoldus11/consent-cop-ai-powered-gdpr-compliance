@@ -1,17 +1,24 @@
-// ITERATION 31: Use puppeteer-extra with stealth plugin to bypass bot detection
-import puppeteerExtra from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import { Browser, Page } from 'puppeteer';
+// ANTI-BOT DETECTION: Advanced framework to bypass Cloudflare/DataDome
+import { chromium, Browser, Page, BrowserContext } from 'playwright';
+import { createCursor } from 'ghost-cursor';
 import { ScanResult, RequestLog } from '../types.js';
-import { detectCMP, detectTagManagementSystems, extractDataLayers, setupDataLayerProxies, detectConsentManagementSystem, CMS_SIGNATURES, TMS_SIGNATURES } from './detectors.js';
+import { detectTagManagementSystems, extractDataLayers, setupDataLayerProxies, detectConsentManagementSystem, CMS_SIGNATURES, TMS_SIGNATURES } from './detectors.js';
 import { calculateRiskScore, estimateFineRange } from './scoring.js';
 import { detectTMSWithGemini } from './geminiTMSDetection.js';
 import { detectDataLayersWithGemini } from './geminiDataLayerDetection.js';
 import { detectDataLayersFromHTML, extractAnalyticsConfiguration } from './enhancedDetection.js';
-
-// ITERATION 31: Add stealth plugin to bypass bot detection
-puppeteerExtra.use(StealthPlugin());
-
+import { 
+  jitteredDelay, 
+  humanActionDelay, 
+  getRealisticUserAgent, 
+  getRealisticHeaders,
+  checkBotDetection,
+  getNextProxy,
+  type ProxyConfig
+} from './antiBotUtils.js';
+import { setupInPageNetworkMonitor, type InPageRequest } from './inPageNetworkMonitor.js';
+import { setupServiceWorkerCapture, type ServiceWorkerRequest } from './serviceWorkerCapture.js';
+import { setupScriptRewriting } from './scriptRewriter.js';
 /**
  * Delay helper - replaces deprecated page.waitForTimeout()
  */
@@ -29,9 +36,16 @@ interface NetworkRequest {
 }
 
 /**
- * Main scanner function - CRITICAL FIXES APPLIED
+ * Main scanner function - ANTI-BOT DETECTION FRAMEWORK
+ * Uses Playwright with advanced stealth techniques to bypass Cloudflare/DataDome
  */
-export async function scanWebsite(url: string): Promise<ScanResult> {
+export async function scanWebsite(
+  url: string, 
+  options?: {
+    proxyPool?: ProxyConfig[];
+    skipBotCheck?: boolean;
+  }
+): Promise<ScanResult> {
   // CRITICAL: Fix URL normalization - handle typos and ensure valid protocol
   let targetUrl = url.trim();
   
@@ -57,20 +71,66 @@ export async function scanWebsite(url: string): Promise<ScanResult> {
   console.log(`[SCAN] URL normalization: "${url}" -> "${targetUrl}"`);
   
   let browser: Browser | null = null;
+  let context: BrowserContext | null = null;
+  let inPageMonitor: { getRequests: () => InPageRequest[]; cleanup: () => void } | null = null;
+  let swMonitor: { getRequests: () => ServiceWorkerRequest[]; cleanup: () => void } | null = null;
   
   try {
-    // ITERATION 31: Use puppeteer-extra with stealth plugin for better bot detection bypass
-    console.log('[ITER31] Launching browser with puppeteer-extra + stealth plugin...');
-    browser = await puppeteerExtra.launch({
+    // ANTI-BOT: Launch Playwright browser with anti-bot detection bypass
+    console.log('[ANTI-BOT] Launching Playwright browser...');
+    const proxy = getNextProxy(options?.proxyPool);
+    browser = await chromium.launch({
       headless: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
+        '--disable-blink-features=AutomationControlled',
       ],
     });
-
-    const page = await browser.newPage();
+    
+    context = await browser.newContext({
+      viewport: { width: 1920, height: 1080 },
+      userAgent: getRealisticUserAgent(),
+      locale: 'en-US',
+      timezoneId: 'America/New_York',
+      extraHTTPHeaders: getRealisticHeaders(),
+      proxy: proxy ? {
+        server: `http://${proxy.host}:${proxy.port}`,
+        username: proxy.username,
+        password: proxy.password,
+      } : undefined,
+      javaScriptEnabled: true,
+    });
+    
+    const page = await context.newPage();
+    
+    // FIX 1: CDP Override - Hide automation markers at protocol level
+    try {
+      const client = await context.newCDPSession(page);
+      await client.send('Runtime.addBinding', { name: 'chrome' });
+      await client.send('Page.addScriptToEvaluateOnNewDocument', {
+        source: `
+          Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+          delete navigator.__proto__.webdriver;
+          window.chrome = { runtime: {} };
+          Object.defineProperty(navigator, 'plugins', { 
+            get: () => [1, 2, 3, 4, 5] 
+          });
+          Object.defineProperty(navigator, 'languages', { 
+            get: () => ['en-US', 'en', 'de'] 
+          });
+          Object.defineProperty(navigator, 'permissions', {
+            get: () => ({
+              query: async () => ({ state: 'granted' })
+            })
+          });
+        `
+      });
+      console.log('[CDP] Automation markers hidden via CDP override');
+    } catch (error: any) {
+      console.warn('[CDP] CDP override failed (non-critical):', error.message);
+    }
     
     // ITERATION 23: CRITICAL - Enable request interception to capture ALL requests
     // Standard listener may miss requests that are blocked/intercepted
@@ -78,33 +138,47 @@ export async function scanWebsite(url: string): Promise<ScanResult> {
     let consentClickTimestamp: number | null = null;
     let bannerExists = false;
     
-    console.log('[ITER23] Enabling request interception to capture ALL requests...');
-    await page.setRequestInterception(true);
+    // ANTI-BOT: Set up in-page network monitoring
+    inPageMonitor = await setupInPageNetworkMonitor(page);
     
+    // NEW: Set up Service Worker capture (intercepts ALL fetch calls)
+    try {
+      swMonitor = await setupServiceWorkerCapture(page);
+      console.log('[SW] Service Worker capture initialized');
+    } catch (error: any) {
+      console.warn('[SW] Service Worker setup failed (non-critical):', error.message);
+    }
+    
+    // NEW: Set up script rewriting to inject data layer capture
+    try {
+      await setupScriptRewriting(page);
+      console.log('[SCRIPT REWRITE] Script rewriting enabled');
+    } catch (error: any) {
+      console.warn('[SCRIPT REWRITE] Script rewriting setup failed (non-critical):', error.message);
+    }
+    
+    console.log('[ANTI-BOT] Enabling Playwright request listeners...');
     page.on('request', (request) => {
       const url = request.url();
       const networkRequest: NetworkRequest = {
         url: url,
         method: request.method(),
         headers: request.headers(),
-        postData: request.postData(),
+        postData: request.postData() || undefined,
         timestamp: Date.now(),
         resourceType: request.resourceType(),
       };
       allRequests.push(networkRequest);
       
-      // ITERATION 23: Log Adobe requests immediately
+      // Log Adobe requests immediately
       if (/adobe|omtrdc|2o7|adobedc|AppMeasurement|adobedtm|assets\.adobedtm/i.test(url)) {
-        console.log(`[ITER23] ✓✓✓ CAPTURED Adobe request: ${request.resourceType()} ${url.substring(0, 200)}`);
+        console.log(`[ANTI-BOT] ✓✓✓ CAPTURED Adobe request: ${request.resourceType()} ${url.substring(0, 200)}`);
       }
       
       // Log first 30 requests for debugging
       if (allRequests.length <= 30) {
         console.log(`[REQUEST] ${allRequests.length}. ${request.resourceType()}: ${url.substring(0, 120)}`);
       }
-      
-      // Continue the request (don't block)
-      request.continue();
     });
     
     // Listen to console logs
@@ -115,59 +189,40 @@ export async function scanWebsite(url: string): Promise<ScanResult> {
       }
     });
     
+    // ANTI-BOT: Remove automation indicators
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => false });
+      (window as any).chrome = { runtime: {} };
+    });
+    
     // Set up data layer proxies BEFORE navigation
     await setupDataLayerProxies(page);
     
-    // Set viewport
-    await page.setViewport({ width: 1920, height: 1080 });
+    console.log('[ANTI-BOT] Request listener set up. Starting navigation...');
 
-    // Set user agent
-    await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-
-    // Set extra headers
-    await page.setExtraHTTPHeaders({
-      'Accept-Language': 'en-US,en;q=0.9,de;q=0.8',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Encoding': 'gzip, deflate, br',
-      'Connection': 'keep-alive',
-      'Upgrade-Insecure-Requests': '1',
-    });
-    
-    console.log('[ITER21] Request listener set up. Starting navigation...');
-
-    // ITERATION 35: Ensure JavaScript is enabled and use different navigation strategy
-    console.log('[ITER35] Ensuring JavaScript enabled and setting up navigation...');
-    await page.setJavaScriptEnabled(true);
-    
-    // ITERATION 35: Navigate with networkidle0 to catch all requests (including delayed ones)
+    // ANTI-BOT: Navigate with human-like timing
     console.log(`[SCAN] Navigating to: ${targetUrl}`);
     const startTime = Date.now();
     
+    await humanActionDelay();
+    
     try {
-      // ITERATION 35: Use networkidle0 to wait for ALL network activity to complete
       await page.goto(targetUrl, {
-        waitUntil: 'networkidle0', // ITERATION 35: Wait for network to be completely idle
-        timeout: 60000, // ITERATION 35: Longer timeout for slow-loading scripts
+        waitUntil: 'networkidle',
+        timeout: 60000,
       });
-      console.log('[ITER35] Navigation completed with networkidle0');
+      console.log('[ANTI-BOT] Navigation completed');
+      await jitteredDelay(1000, 0.3);
     } catch (error: any) {
-      console.warn(`[ITER35] networkidle0 timeout: ${error.message}, trying networkidle2...`);
+      console.warn(`[ANTI-BOT] Navigation timeout: ${error.message}, trying load...`);
       try {
         await page.goto(targetUrl, {
-          waitUntil: 'networkidle2',
-          timeout: 40000,
+          waitUntil: 'load',
+          timeout: 30000,
         });
-        console.log('[ITER35] Navigation completed with networkidle2');
+        console.log('[ANTI-BOT] Navigation completed with load');
       } catch (e: any) {
-        console.warn(`[ITER35] Navigation warning: ${e.message}, using load event...`);
-        try {
-          await page.goto(targetUrl, {
-            waitUntil: 'load',
-            timeout: 30000,
-          });
-        } catch (e2: any) {
-          console.warn(`[ITER35] Final navigation error: ${e2.message}`);
-        }
+        console.warn(`[SCAN] Navigation warning: ${e.message}`);
       }
     }
 
@@ -186,10 +241,11 @@ export async function scanWebsite(url: string): Promise<ScanResult> {
     const pageContent = await page.content();
 
     // CRITICAL: Capture screenshot BEFORE consent (should show banner)
-    const screenshotBefore = await page.screenshot({ 
-      encoding: 'base64',
+    const screenshotBefore = (await page.screenshot({ 
+      type: 'png',
       fullPage: false 
-    }) as string;
+    })) as Buffer;
+    const screenshotBeforeBase64 = screenshotBefore.toString('base64');
     
     // DEBUG: Log requests captured BEFORE consent click
     console.log(`[DEBUG] Requests captured BEFORE consent click: ${allRequests.length}`);
@@ -222,7 +278,7 @@ export async function scanWebsite(url: string): Promise<ScanResult> {
           console.log('[BANNER] Banner disappeared');
         } catch (e) {
           console.log('[BANNER] Banner may still be visible');
-          await delay(3000); // Fallback wait
+          await jitteredDelay(3000, 0.3); // Fallback wait with jitter
         }
         
         // ITERATION 14: Wait MUCH longer (20+ seconds) to capture ALL Adobe requests (screenshot shows many load after consent)
@@ -252,10 +308,11 @@ export async function scanWebsite(url: string): Promise<ScanResult> {
     }
 
     // FIX: Capture screenshot AFTER consent (should NOT show banner if click worked)
-    const screenshotAfter = await page.screenshot({ 
-      encoding: 'base64',
+    const screenshotAfter = (await page.screenshot({ 
+      type: 'png',
       fullPage: false 
-    }) as string;
+    })) as Buffer;
+    const screenshotAfterBase64 = screenshotAfter.toString('base64');
     
     // DEBUG: Verify banner is gone in after screenshot
     if (bannerExists && consentClickTimestamp) {
@@ -304,23 +361,70 @@ export async function scanWebsite(url: string): Promise<ScanResult> {
     console.log(`[SCAN] Found ${dynamicScriptUrls.length} script tags`);
     console.log(`[SCAN] JavaScript context: ${JSON.stringify(jsContext, null, 2)}`);
 
-    // ITERATION 29: Extract data layers with multiple attempts
+    // NEW: Check for data layers captured by script rewriting
+    const capturedDataLayers = await page.evaluate(() => {
+      const captured = (window as any).__consentCopDataLayers || {};
+      const layerNames: string[] = [];
+      Object.keys(captured).forEach(name => {
+        if (captured[name]) {
+          layerNames.push(name);
+        }
+      });
+      return layerNames;
+    }).catch(() => []);
+    
+    if (capturedDataLayers.length > 0) {
+      console.log(`[SCRIPT REWRITE] Found data layers via script rewriting: ${capturedDataLayers.join(', ')}`);
+    }
+    
+    // ANTI-BOT: Extract data layers with human-like timing
     let dataLayers = await extractDataLayers(page);
     
-    // ITERATION 29: If no data layers but objects exist, try multiple times with increasing delays
+    // Merge captured data layers
+    capturedDataLayers.forEach(layer => {
+      if (!dataLayers.includes(layer)) {
+        dataLayers.push(layer);
+      }
+    });
+    
+    // ANTI-BOT: If no data layers but objects exist, try multiple times with jittered delays
     if (dataLayers.length === 0 && (jsContext.adobeDetected || jsContext.gtmDetected)) {
-      console.log('[ITER29] Objects detected but no data layers, retrying with multiple attempts...');
+      console.log('[ANTI-BOT] Objects detected but no data layers, retrying with human-like timing...');
       for (let attempt = 1; attempt <= 3; attempt++) {
-        await delay(2000 * attempt); // Increasing delay: 2s, 4s, 6s
+        await jitteredDelay(2000 * attempt, 0.3); // Jittered increasing delay: ~2s, ~4s, ~6s
         const dataLayersRetry = await extractDataLayers(page);
         if (dataLayersRetry.length > 0) {
-          console.log(`[ITER29] Found data layers on attempt ${attempt}: ${dataLayersRetry.join(', ')}`);
+          console.log(`[ANTI-BOT] Found data layers on attempt ${attempt}: ${dataLayersRetry.join(', ')}`);
           dataLayers = dataLayersRetry;
           break;
         }
       }
     }
 
+    // NEW: Merge Service Worker requests with Playwright requests
+    if (swMonitor) {
+      const swRequests = swMonitor.getRequests();
+      console.log(`[SW] Service Worker captured ${swRequests.length} additional requests`);
+      
+      // Convert SW requests to NetworkRequest format and merge
+      swRequests.forEach(swReq => {
+        const networkReq: NetworkRequest = {
+          url: swReq.url,
+          method: swReq.method,
+          headers: swReq.headers,
+          postData: swReq.body,
+          timestamp: swReq.timestamp,
+          resourceType: 'xhr', // Service Workers typically intercept XHR/fetch
+        };
+        
+        // Only add if not already captured
+        if (!allRequests.find(r => r.url === swReq.url && Math.abs(r.timestamp - swReq.timestamp) < 1000)) {
+          allRequests.push(networkReq);
+          console.log(`[SW] ✓ Captured: ${swReq.method} ${swReq.url.substring(0, 100)}`);
+        }
+      });
+    }
+    
     // CRITICAL: Split requests correctly - if consent was NOT clicked, 
     // use a timestamp FAR in the future so all requests are "before"
     const splitTimestamp = consentClickTimestamp || Number.MAX_SAFE_INTEGER;
@@ -409,10 +513,16 @@ export async function scanWebsite(url: string): Promise<ScanResult> {
       }
     }
     
-    if (jsContext.gtmDetected && !tmsDetection.detected.includes('gtm')) {
-      console.log('[DETECTION] GTM detected in JavaScript context - adding to detected TMS');
+    // CRITICAL FIX: Only add GTM if we see actual GTM container script (google_tag_manager object)
+    // Don't add GTM just because dataLayer exists - dataLayer is used by many tools (Adobe Launch, Tealium, etc.)
+    // Check if GTM is actually firing (has actual container script)
+    const isGTMActuallyFiring = allUrls.some(url => /googletagmanager\.com\/gtm\.js\?id=GTM-[A-Z0-9]+/i.test(url));
+    if (jsContext.gtmDetected && !tmsDetection.detected.includes('gtm') && isGTMActuallyFiring) {
+      console.log('[DETECTION] GTM detected in JavaScript context AND GTM container is firing - adding to detected TMS');
       tmsDetection.detected.push('gtm');
       tmsDetection.dataLayerNames.push('dataLayer');
+    } else if (jsContext.gtmDetected && !isGTMActuallyFiring) {
+      console.log('[DETECTION] ⚠ GTM patterns found (dataLayer/google_tag_manager) but GTM container not firing - skipping (likely false positive, dataLayer used by other tools like Adobe Launch)');
     }
     
     // GEMINI AI FALLBACK: If no TMS detected, use Gemini AI to analyze HTML/scripts
@@ -513,8 +623,8 @@ export async function scanWebsite(url: string): Promise<ScanResult> {
       bannerProvider: bannerProvider || undefined,
       requests: allRequestLogs,
       screenshots: {
-        before: `data:image/png;base64,${screenshotBefore}`,
-        after: `data:image/png;base64,${screenshotAfter}`,
+        before: `data:image/png;base64,${screenshotBeforeBase64}`,
+        after: `data:image/png;base64,${screenshotAfterBase64}`,
       },
       dataLayers,
       tmsDetected,
@@ -534,6 +644,16 @@ export async function scanWebsite(url: string): Promise<ScanResult> {
 
     return result;
   } finally {
+    // Cleanup
+    if (inPageMonitor) {
+      inPageMonitor.cleanup();
+    }
+    if (swMonitor) {
+      swMonitor.cleanup();
+    }
+    if (context) {
+      await context.close();
+    }
     if (browser) {
       await browser.close();
     }
@@ -541,29 +661,31 @@ export async function scanWebsite(url: string): Promise<ScanResult> {
 }
 
 /**
- * ITERATION 1: Wait for JavaScript objects - improved with longer timeout
+ * ANTI-BOT: Wait for JavaScript objects with human-like timing
  */
 async function waitForJavaScriptObjects(page: Page): Promise<void> {
   try {
-    // Try to wait for ANY TMS object with longer timeout
+    // Try to wait for ANY TMS object with jittered timeout
     const found = await page.waitForFunction(
       () => {
         const w = window as any;
         return !!(w.dataLayer || w.adobeDataLayer || w._satellite || w.digitalData || 
                  w.s || w.google_tag_manager || w.adobe || w.utag_data);
       },
-      { timeout: 10000 } // Increased timeout
+      { timeout: 10000 }
     );
     if (found) {
-      console.log('[SCAN] JavaScript objects found');
+      console.log('[ANTI-BOT] JavaScript objects found');
+      // Human-like delay after detection
+      await jitteredDelay(500, 0.3);
     }
   } catch (e) {
-    console.log('[SCAN] JavaScript objects wait timeout (scripts may load later)');
+    console.log('[ANTI-BOT] JavaScript objects wait timeout (scripts may load later)');
   }
 }
 
 /**
- * Extract JavaScript execution context to detect TMS - ENHANCED
+ * ANTI-BOT: Extract JavaScript execution context (works with Playwright)
  */
 async function extractJavaScriptContext(page: Page): Promise<{
   adobeDetected: boolean;
@@ -673,8 +795,8 @@ async function extractJavaScriptContext(page: Page): Promise<{
  */
 async function checkForBanner(page: Page): Promise<boolean> {
   try {
-    // Wait a bit for banner to potentially appear
-    await delay(2000);
+    // Wait a bit for banner to potentially appear (human-like timing)
+    await jitteredDelay(2000, 0.3);
     
     const found = await page.evaluate(() => {
       const selectors = [
@@ -719,13 +841,66 @@ async function checkForBanner(page: Page): Promise<boolean> {
 }
 
 /**
- * Try to click consent banner
+ * FIX 3: Try to click consent banner with improved detection
  */
 async function tryClickConsentBanner(page: Page): Promise<{ clicked: boolean; timestamp: number }> {
   // CRITICAL: Get timestamp BEFORE clicking (for accurate request tracking)
   const clickTimestamp = Date.now();
   
   try {
+    // Wait for banner to be fully loaded and interactive
+    await page.waitForSelector('[id*="usercentrics"], [class*="uc-"], [class*="consent"], [id*="consent"]', {
+      state: 'visible',
+      timeout: 5000
+    }).catch(() => {
+      console.log('[BANNER] Banner selector not found, trying direct click...');
+    });
+    
+    // Try multiple selectors in order of specificity
+    const selectors = [
+      'button[id*="uc-accept"]',
+      'button[data-testid*="accept"]',
+      '[id*="usercentrics"] button',
+      'button:has-text("Alles akzeptieren")',
+      'button:has-text("Accept all")',
+      'button:has-text("Akzeptieren")',
+      'button:has-text("Accept")',
+    ];
+    
+    for (const selector of selectors) {
+      try {
+        const button = page.locator(selector).first();
+        if (await button.isVisible({ timeout: 2000 }).catch(() => false)) {
+          // Try ghost-cursor first for human-like movement
+          try {
+            const cursor = createCursor(page as any);
+            const box = await button.boundingBox();
+            if (box) {
+              await humanActionDelay();
+              await cursor.moveTo({
+                x: box.x + box.width / 2,
+                y: box.y + box.height / 2,
+              });
+              await jitteredDelay(200, 0.4);
+              await cursor.click();
+              console.log(`[BANNER] ✓ Clicked with ghost-cursor: ${selector}`);
+              return { clicked: true, timestamp: clickTimestamp };
+            }
+          } catch (cursorError) {
+            // Fallback to regular click
+          }
+          
+          // Regular Playwright click
+          await button.click({ timeout: 2000 });
+          console.log(`[BANNER] ✓ Clicked: ${selector}`);
+          return { clicked: true, timestamp: clickTimestamp };
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+    
+    // Fallback: JavaScript click for buttons with text matching
     const clicked = await page.evaluate(() => {
       // ITERATION 13: Look for German "Alles akzeptieren" button (from screenshot)
       const buttons = Array.from(document.querySelectorAll('button, a, [role="button"]'));
@@ -749,8 +924,8 @@ async function tryClickConsentBanner(page: Page): Promise<{ clicked: boolean; ti
       // Check for Usercentrics specific elements
       const ucElements = document.querySelectorAll('[id*="usercentrics"], [class*="uc-"], [class*="usercentrics"]');
       for (const el of Array.from(ucElements)) {
-        const buttons = el.querySelectorAll('button');
-        for (const btn of Array.from(buttons)) {
+        const ucButtons = el.querySelectorAll('button');
+        for (const btn of Array.from(ucButtons)) {
           const text = (btn.textContent || '').toLowerCase().trim();
           if ((text.includes('accept') || text.includes('akzeptieren')) && 
               (btn as HTMLElement).offsetParent !== null) {
@@ -764,34 +939,11 @@ async function tryClickConsentBanner(page: Page): Promise<{ clicked: boolean; ti
     });
     
     if (clicked) {
-      console.log('[BANNER] Consent button clicked');
+      console.log('[BANNER] ✓ Clicked via JavaScript fallback');
       return { clicked: true, timestamp: clickTimestamp };
     }
     
-    // Try specific selectors
-    const selectors = [
-      'button[data-testid="uc-accept-all-button"]',
-      'button[id*="uc-accept"]',
-      '[id*="usercentrics"] button',
-      '#onetrust-accept-btn-handler',
-    ];
-    
-    for (const selector of selectors) {
-      try {
-        const button = await page.$(selector);
-        if (button) {
-          const isVisible = await button.isIntersectingViewport();
-          if (isVisible) {
-            await button.click();
-            console.log(`[BANNER] ✓ Clicked: ${selector}`);
-            return { clicked: true, timestamp: clickTimestamp };
-          }
-        }
-      } catch (e) {
-        continue;
-      }
-    }
-    
+    console.log('[BANNER] ✗ No consent button found');
     return { clicked: false, timestamp: clickTimestamp };
   } catch (error: any) {
     console.log(`[BANNER] Error clicking: ${error.message}`);
@@ -839,8 +991,21 @@ function processRequests(
         return;
       }
 
-      // Determine if it's a violation
-      const isViolation = isTracking && cmpProvider !== null;
+      // IMPROVED: Smarter violation detection
+      // Not all pre-consent tracking requests are violations:
+      // 1. CMP initialization scripts are allowed
+      // 2. Strictly necessary cookies/scripts are allowed
+      // 3. Only mark as violation if it's tracking AND collecting PII AND CMP is present
+      const isCMPInitialization = isCMPRelatedRequest(req.url, cmpProvider);
+      const isStrictlyNecessary = isStrictlyNecessaryRequest(req.url, domain);
+      const hasPII = inferDataTypes(req.url, req.headers, req.postData).length > 0;
+      
+      // Violation = tracking request + has PII + CMP present + NOT CMP initialization + NOT strictly necessary
+      const isViolation = isTracking && 
+                         cmpProvider !== null && 
+                         hasPII && 
+                         !isCMPInitialization && 
+                         !isStrictlyNecessary;
 
       requestLogs.push({
         id: `req_${index}`,
@@ -892,24 +1057,38 @@ function processRequests(
 /**
  * Check if a request is a tracking request
  */
+// FIX 4: Improved tracking request detection with expanded patterns
 function isTrackingRequest(url: string, domain: string): boolean {
   const urlLower = url.toLowerCase();
   const domainLower = domain.toLowerCase();
+  
+  // Extract base domain from URL for comparison
+  let urlDomain = '';
+  try {
+    const urlObj = new URL(url);
+    urlDomain = urlObj.hostname.replace(/^www\./, '');
+  } catch {
+    // Invalid URL, skip domain check
+  }
   
   const trackingDomains = [
     'google-analytics.com',
     'googletagmanager.com',
     'doubleclick.net',
     'googleadservices.com',
+    'googlesyndication.com',
     'facebook.com',
     'facebook.net',
+    'fbcdn.net',
     'adobe.com',
     'adobedtm.com',
     'omtrdc.net',
     '2o7.net',
     'adobedc.net',
+    'edge.adobedc.net',
     'adobesc.com',
     'adobetagservices.com',
+    'assets.adobedtm.com',
     'hotjar.com',
     'segment.io',
     'segment.com',
@@ -920,9 +1099,21 @@ function isTrackingRequest(url: string, domain: string): boolean {
     'mouseflow.com',
   ];
 
+  // Check if URL domain matches tracking domains
+  if (urlDomain && trackingDomains.some(td => urlDomain.includes(td.replace(/^www\./, '')))) {
+    return true;
+  }
+
+  // FIX 4: Expanded tracking patterns
   const trackingPatterns = [
-    /analytics/i,
-    /tracking/i,
+    // Adobe patterns (expanded)
+    /adobe|omtrdc|2o7|adobedc|appmeasurement|adobedtm|assets\.adobedtm|edge\.adobedc|adobesc|adobetagservices/i,
+    // Google patterns (expanded)
+    /google-analytics|googletagmanager|doubleclick|googleadservices|googlesyndication|gtag|ga\.js|analytics\.js|gstatic\.com\/analytics/i,
+    // Facebook patterns (expanded)
+    /facebook\.com\/tr|fbcdn\.net|facebook\.net|fb\.com/i,
+    // General tracking patterns (expanded)
+    /analytics|tracking|pixel|beacon|track|collect|measure|telemetry/i,
     /pixel/i,
     /beacon/i,
     /collect/i,
@@ -954,6 +1145,52 @@ function isEssentialResource(url: string): boolean {
   ];
 
   return essentialPatterns.some(p => p.test(url));
+}
+
+/**
+ * Check if request is CMP-related (CMP initialization scripts are allowed)
+ */
+function isCMPRelatedRequest(url: string, cmpProvider: string | null): boolean {
+  if (!cmpProvider) return false;
+  
+  const cmpPatterns: Record<string, RegExp[]> = {
+    'Usercentrics': [/usercentrics\.eu/i, /usercentrics\.com/i, /uc-/i, /UC_UI/i],
+    'OneTrust': [/onetrust\.com/i, /optanon/i, /cookiepro/i],
+    'Cookiebot': [/cookiebot\.com/i, /cookiebot/i],
+    'CookieYes': [/cookieyes\.com/i, /cookieyes/i],
+    'Quantcast': [/quantcast\.com/i, /quantserve\.com/i, /__tcfapi/i],
+    'Didomi': [/didomi\.io/i, /didomi/i, /privacy-center\.org/i],
+  };
+  
+  const patterns = cmpPatterns[cmpProvider] || [];
+  return patterns.some(p => p.test(url));
+}
+
+/**
+ * Check if request is strictly necessary (allowed without consent)
+ */
+function isStrictlyNecessaryRequest(url: string, domain: string): boolean {
+  // First-party analytics that don't collect PII might be considered strictly necessary
+  // But this is a gray area - we'll be conservative and only mark obvious cases
+  
+  // CDN, fonts, images, stylesheets are strictly necessary
+  if (isEssentialResource(url)) return true;
+  
+  // First-party requests that are clearly functional (not tracking)
+  const functionalPatterns = [
+    /\/api\//i,
+    /\/static\//i,
+    /\/assets\//i,
+    /\.(jpg|jpeg|png|gif|svg|webp|ico)$/i,
+  ];
+  
+  // Only if it's first-party (same domain or subdomain)
+  const urlObj = new URL(url);
+  const urlDomain = urlObj.hostname.replace(/^www\./, '');
+  const baseDomain = domain.replace(/^www\./, '');
+  const isFirstParty = urlDomain === baseDomain || urlDomain.endsWith(`.${baseDomain}`);
+  
+  return isFirstParty && functionalPatterns.some(p => p.test(url));
 }
 
 /**

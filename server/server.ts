@@ -13,6 +13,7 @@ dotenv.config({ path: join(__dirname, '..', '.env') }); // Fallback to .env if .
 import express from 'express';
 import cors from 'cors';
 import { scanWebsite } from './scanner.js';
+import { scanResultCache } from './cache.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -25,19 +26,49 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Scan endpoint
+// Cache stats endpoint (for monitoring)
+app.get('/api/cache/stats', (req, res) => {
+  const stats = scanResultCache.getStats();
+  res.json({
+    cacheSize: stats.size,
+    cachedUrls: stats.keys.slice(0, 10), // Show first 10
+    totalCached: stats.size,
+  });
+});
+
+// Scan endpoint with caching
 app.post('/api/scan', async (req, res) => {
-  const { url } = req.body;
+  const { url, forceRefresh } = req.body;
 
   if (!url) {
     return res.status(400).json({ error: 'URL is required' });
   }
 
   try {
-    console.log(`Starting scan for: ${url}`);
+    // Check cache first (unless forceRefresh is true)
+    if (!forceRefresh) {
+      const cachedResult = scanResultCache.get(url);
+      if (cachedResult) {
+        console.log(`[CACHE] Returning cached result for: ${url}`);
+        return res.json({
+          ...cachedResult,
+          cached: true,
+          cacheTimestamp: cachedResult.timestamp,
+        });
+      }
+    }
+
+    console.log(`[SCAN] Starting scan for: ${url}`);
     const result = await scanWebsite(url);
-    console.log(`Scan completed for: ${url}`);
-    res.json(result);
+    
+    // Cache the result (24 hours TTL)
+    scanResultCache.set(url, result);
+    console.log(`[SCAN] Scan completed and cached for: ${url}`);
+    
+    res.json({
+      ...result,
+      cached: false,
+    });
   } catch (error: any) {
     console.error('Scan error:', error);
     res.status(500).json({ 
@@ -48,9 +79,21 @@ app.post('/api/scan', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+// Handle port conflicts gracefully
+const server = app.listen(PORT, () => {
   console.log(`🚀 Consent Cop Scanner API running on http://localhost:${PORT}`);
   console.log(`📡 Health check: http://localhost:${PORT}/health`);
   console.log(`🔍 Scan endpoint: POST http://localhost:${PORT}/api/scan`);
+});
+
+server.on('error', (error: any) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`❌ Port ${PORT} is already in use.`);
+    console.error(`   Please kill the process using: lsof -ti:${PORT} | xargs kill -9`);
+    console.error(`   Or use a different port by setting PORT environment variable.`);
+    process.exit(1);
+  } else {
+    throw error;
+  }
 });
 
