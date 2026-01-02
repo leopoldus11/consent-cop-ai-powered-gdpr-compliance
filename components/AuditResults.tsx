@@ -592,23 +592,21 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
           </div>
 
           {/* CONSENT GATE Divider - Bold Horizontal */}
-          <div 
-            className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-y-2 border-blue-600 my-4 py-3"
-            style={{ 
-              marginTop: `${((consentTimestamp - minTime) / duration) * 100}%`,
-              marginBottom: '1rem'
-            }}
-          >
-            <div className="flex items-center justify-center">
-              <div className="absolute left-6 w-4 h-4 rounded-full bg-blue-600 border-2 border-white ring-4 ring-blue-500/30"></div>
-              <div className="bg-blue-600 text-white px-6 py-2 rounded-lg text-base font-black uppercase tracking-wider">
-                CONSENT GATE
+          {filteredRequests.some(r => r.timestamp >= consentTimestamp) && filteredRequests.some(r => r.timestamp < consentTimestamp) && (
+            <div className="relative my-6">
+              <div className="absolute left-6 w-4 h-4 rounded-full bg-blue-600 border-2 border-white ring-4 ring-blue-500/30 z-20"></div>
+              <div className="ml-16 bg-white/95 backdrop-blur-sm border-y-2 border-blue-600 py-3 rounded-lg">
+                <div className="flex items-center justify-center mb-2">
+                  <div className="bg-blue-600 text-white px-6 py-2 rounded-lg text-base font-black uppercase tracking-wider">
+                    CONSENT GATE
+                  </div>
+                </div>
+                <div className="text-xs text-center text-slate-500 font-medium">
+                  Everything above is Pre-Consent • Everything below is Post-Consent Simulation
+                </div>
               </div>
             </div>
-            <div className="text-xs text-center text-slate-500 mt-2 font-medium">
-              Everything above is Pre-Consent • Everything below is Post-Consent Simulation
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
