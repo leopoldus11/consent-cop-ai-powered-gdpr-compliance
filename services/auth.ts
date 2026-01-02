@@ -90,6 +90,8 @@ export async function saveUserSession(session: UserSession): Promise<void> {
     };
     
     localStorage.setItem(STORAGE_KEY, JSON.stringify(encryptedSession));
+    // Dispatch custom event to notify components of login
+    window.dispatchEvent(new Event('user-login'));
   } catch (error) {
     console.error('Error saving user session:', error);
   }
@@ -100,6 +102,8 @@ export async function saveUserSession(session: UserSession): Promise<void> {
  */
 export function clearUserSession(): void {
   localStorage.removeItem(STORAGE_KEY);
+  // Dispatch custom event to notify components of logout
+  window.dispatchEvent(new Event('user-logout'));
 }
 
 /**
