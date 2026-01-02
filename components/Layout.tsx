@@ -630,7 +630,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
              </div>
           </div>
         </div>
-      )}
+      </div>
 
       {currentPage !== 'home' && (
         <footer className="bg-white border-t border-slate-200 py-8 sm:py-12 lg:py-16">
