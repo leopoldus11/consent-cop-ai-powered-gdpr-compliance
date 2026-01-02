@@ -562,6 +562,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
         style={{
           backgroundColor: showSettings ? 'rgba(15, 23, 42, 0.6)' : 'transparent'
         }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            if ('startViewTransition' in document) {
+              (document as any).startViewTransition(() => {
+                setShowSettings(false);
+              });
+            } else {
+              setShowSettings(false);
+            }
+          }
+        }}
       >
         <div 
           className={`bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 border border-slate-100 transition-all duration-300 ease-out ${
