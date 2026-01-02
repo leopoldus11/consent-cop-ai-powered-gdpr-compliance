@@ -503,15 +503,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                 <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest mb-4">Product</h3>
                 <ul className="space-y-2.5 text-sm text-slate-500 font-medium">
                   <li><button onClick={() => onPageChange('enterprise')} className="hover:text-blue-600 transition-colors text-left">Enterprise</button></li>
-                  <li><button onClick={() => onPageChange('docs')} className="hover:text-blue-600 transition-colors text-left">Documentation</button></li>
-                  <li><button onClick={() => onPageChange('security')} className="hover:text-blue-600 transition-colors text-left">Security Architecture</button></li>
+                  <li><button onClick={() => onPageChange('docs')} className="hover:text-blue-600 transition-colors text-left">Docs</button></li>
                 </ul>
               </div>
               <div>
                 <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest mb-4">Legal</h3>
                 <ul className="space-y-2.5 text-sm text-slate-500 font-medium">
-                  <li><button onClick={() => onPageChange('impressum')} className="hover:text-blue-600 transition-colors text-left font-bold text-slate-800">Imprint</button></li>
-                  <li><button onClick={() => onPageChange('privacy')} className="hover:text-blue-600 transition-colors text-left font-bold text-slate-800">Privacy Policy</button></li>
+                  <li><button onClick={() => onPageChange('impressum')} className="hover:text-blue-600 transition-colors text-left">Imprint</button></li>
+                  <li><button onClick={() => onPageChange('privacy')} className="hover:text-blue-600 transition-colors text-left">Privacy Policy</button></li>
                 </ul>
               </div>
             </div>
@@ -536,15 +535,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
               <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest mb-6">Product</h3>
               <ul className="space-y-3 text-sm text-slate-500 font-medium">
                 <li><button onClick={() => onPageChange('enterprise')} className="hover:text-blue-600 transition-colors">Enterprise</button></li>
-                <li><button onClick={() => onPageChange('docs')} className="hover:text-blue-600 transition-colors">Documentation</button></li>
-                <li><button onClick={() => onPageChange('security')} className="hover:text-blue-600 transition-colors">Security Architecture</button></li>
+                <li><button onClick={() => onPageChange('docs')} className="hover:text-blue-600 transition-colors">Docs</button></li>
               </ul>
             </div>
             <div>
               <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest mb-6">Legal</h3>
               <ul className="space-y-3 text-sm text-slate-500 font-medium">
-                <li><button onClick={() => onPageChange('impressum')} className="hover:text-blue-600 transition-colors font-bold text-slate-800">Imprint</button></li>
-                <li><button onClick={() => onPageChange('privacy')} className="hover:text-blue-600 transition-colors font-bold text-slate-800">Privacy Policy</button></li>
+                <li><button onClick={() => onPageChange('impressum')} className="hover:text-blue-600 transition-colors">Imprint</button></li>
+                <li><button onClick={() => onPageChange('privacy')} className="hover:text-blue-600 transition-colors">Privacy Policy</button></li>
               </ul>
             </div>
           </div>
@@ -552,11 +550,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
         
         {/* Copyright - Mobile optimized */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 lg:pt-12 mt-6 sm:mt-8 lg:mt-12 border-t border-slate-100">
-          <div className="flex items-center justify-center sm:justify-start space-x-2 text-slate-400 text-xs sm:text-[10px] font-black uppercase tracking-widest">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+          <div className="flex items-center justify-center sm:justify-start space-x-2 text-slate-400 text-xs sm:text-[10px] font-medium">
+            <span>{new Date().getFullYear()}</span>
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.54-13H9.5c-.28 0-.5.22-.5.5v7c0 .28.22.5.5.5h2.04c.28 0 .5-.22.5-.5v-7c0-.28-.22-.5-.5-.5zm0 4H9.5v-3h2.04v3z"/>
             </svg>
-            <span>{new Date().getFullYear()} CONSENT COP</span>
+            <span>Consent Cop</span>
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.54-13H9.5c-.28 0-.5.22-.5.5v7c0 .28.22.5.5.5h2.04c.28 0 .5-.22.5-.5v-7c0-.28-.22-.5-.5-.5zm0 4H9.5v-3h2.04v3z"/>
+            </svg>
             <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[9px] font-bold">BETA</span>
           </div>
         </div>
