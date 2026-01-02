@@ -78,7 +78,7 @@ const App: React.FC = () => {
   };
 
   const renderHome = () => (
-    <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${!result && !isScanning ? 'flex-1 flex flex-col justify-center' : 'min-h-full'}`}>
+    <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${!result && !isScanning ? 'h-full' : 'min-h-full'}`}>
       <Scanner onScanStart={startScan} isLoading={isScanning} />
       
       {result ? (

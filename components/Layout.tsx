@@ -325,8 +325,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
         </div>
       </header>
 
-      <main className={`${currentPage === 'home' ? 'flex-1 flex flex-col min-h-0 overflow-y-auto' : 'flex-grow'}`}>
-        <div className={currentPage === 'home' ? 'flex-1 flex flex-col min-h-full' : ''}>
+      <main className={`${currentPage === 'home' ? 'flex-1 min-h-0 overflow-y-auto' : 'flex-grow'}`}>
+        <div className={currentPage === 'home' ? 'h-full min-h-0' : ''}>
           {children}
           {currentPage === 'home' && (
             <footer className="bg-white border-t border-slate-200 py-8 sm:py-12 lg:py-16 mt-auto">
