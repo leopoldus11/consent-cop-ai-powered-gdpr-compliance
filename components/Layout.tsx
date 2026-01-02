@@ -580,6 +580,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
               ? 'opacity-100 scale-100 translate-y-0' 
               : 'opacity-0 scale-95 translate-y-4'
           }`}
+          onClick={(e) => e.stopPropagation()}
         >
              <div className="flex justify-between items-center mb-6">
                 <h2 className="text-lg font-black text-slate-900">Advanced Settings</h2>
