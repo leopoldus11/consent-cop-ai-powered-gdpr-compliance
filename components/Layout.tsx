@@ -268,11 +268,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                     setShowMobileMenu(false);
                   }
                 }}
-                className="p-2 -mr-2 text-slate-500 hover:text-slate-700 active:text-slate-900 transition-colors rounded-full hover:bg-slate-100 active:bg-slate-200"
+                className="w-10 h-10 flex items-center justify-center bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 hover:text-slate-700 active:text-slate-900 transition-all rounded-full shadow-sm"
                 aria-label="Close menu"
               >
                 {/* Back arrow instead of X - more intuitive for side menu */}
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
@@ -378,11 +378,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                     setShowProfileModal(false);
                   }
                 }}
-                className="p-2 -mr-2 text-slate-500 hover:text-slate-700 active:text-slate-900 transition-colors rounded-full hover:bg-slate-100 active:bg-slate-200"
+                className="w-10 h-10 flex items-center justify-center bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 hover:text-slate-700 active:text-slate-900 transition-all rounded-full shadow-sm"
                 aria-label="Close menu"
               >
                 {/* Back arrow pointing left (since menu comes from right) */}
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                 </svg>
               </button>
