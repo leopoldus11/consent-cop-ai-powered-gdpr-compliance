@@ -306,26 +306,90 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
   const maxTime = sortedRequests[sortedRequests.length - 1]?.timestamp || minTime;
   const duration = maxTime - minTime || 1;
 
+  // Helper function to detect request category (Marketing, Analytics, Social, Fingerprinting)
+  const detectRequestCategory = (req: RequestLog): 'marketing' | 'analytics' | 'social' | 'fingerprinting' | 'other' => {
+    const urlLower = req.url.toLowerCase();
+    const domainLower = req.domain.toLowerCase();
+    
+    // Marketing/Tracking patterns
+    const marketingPatterns = [
+      /doubleclick|googleadservices|googlesyndication|facebook\.com\/tr|fbcdn|pixel|beacon/i,
+      /advertising|adserver|adsystem|adtech|adform|adnxs|advertising/i,
+      /tiktok|snapchat|pinterest|reddit.*tracking/i,
+    ];
+    
+    // Analytics patterns
+    const analyticsPatterns = [
+      /google-analytics|googletagmanager|analytics\.js|gtag|ga\.js|appmeasurement/i,
+      /adobe.*analytics|omtrdc|2o7\.net|adobedtm|assets\.adobedtm/i,
+      /segment|amplitude|mixpanel|heap|fullstory|hotjar|mouseflow/i,
+    ];
+    
+    // Social tracking patterns
+    const socialPatterns = [
+      /facebook\.com\/tr|facebook\.net|fbcdn|connect\.facebook/i,
+      /linkedin.*tracking|linkedin.*analytics/i,
+      /twitter.*tracking|t\.co/i,
+      /pinterest.*tracking/i,
+    ];
+    
+    // Fingerprinting patterns
+    const fingerprintingPatterns = [
+      /fingerprint|fpjs|fingerprintjs|deviceprint|canvas.*fingerprint/i,
+      /client.*hints|high.*entropy|user.*agent.*client.*hints/i,
+      /canvas.*hash|webgl.*fingerprint|audio.*context.*fingerprint/i,
+    ];
+    
+    // Check fingerprinting first (most specific)
+    if (fingerprintingPatterns.some(p => p.test(urlLower) || p.test(domainLower)) || 
+        req.dataTypes.some(dt => dt.toLowerCase().includes('fingerprint'))) {
+      return 'fingerprinting';
+    }
+    
+    // Check marketing
+    if (marketingPatterns.some(p => p.test(urlLower) || p.test(domainLower))) {
+      return 'marketing';
+    }
+    
+    // Check analytics
+    if (analyticsPatterns.some(p => p.test(urlLower) || p.test(domainLower))) {
+      return 'analytics';
+    }
+    
+    // Check social
+    if (socialPatterns.some(p => p.test(urlLower) || p.test(domainLower))) {
+      return 'social';
+    }
+    
+    return 'other';
+  };
+
   // Categorize requests by compliance status - use consentState from backend
   const categorizedRequests = useMemo(() => {
     return sortedRequests.map(req => {
       const isPreConsent = req.consentState === 'pre-consent';
       const isViolation = req.status === 'violation';
+      const requestCategory = detectRequestCategory(req);
       
-      // Red (Critical): Marketing/Tracking pixel fired before Consent Gate
-      if (isPreConsent && isViolation && req.type === 'pixel') {
-        return { ...req, category: 'critical' as const };
+      // Red (Critical): Marketing/Analytics/Social tracking fired before Consent Gate
+      if (isPreConsent && (requestCategory === 'marketing' || requestCategory === 'analytics' || requestCategory === 'social')) {
+        return { ...req, category: 'critical' as const, requestCategory };
       }
       
-      // Yellow (Warning): Potential fingerprinting or unclassified third-party
+      // Yellow (Warning): Fingerprinting or potential fingerprinting
+      if (isPreConsent && (requestCategory === 'fingerprinting' || req.dataTypes.some(dt => dt.toLowerCase().includes('fingerprint')))) {
+        return { ...req, category: 'warning' as const, requestCategory };
+      }
+      
+      // Yellow (Warning): Other violations or unclassified third-party with data
       if (isPreConsent && (isViolation || req.dataTypes.length > 0)) {
-        return { ...req, category: 'warning' as const };
+        return { ...req, category: 'warning' as const, requestCategory };
       }
       
       // Green (Safe): Strictly necessary (CMP, Hosting, CSS) or post-consent
-      return { ...req, category: 'safe' as const };
+      return { ...req, category: 'safe' as const, requestCategory };
     });
-  }, [sortedRequests, consentTimestamp]);
+  }, [sortedRequests]);
 
   // Apply filter - use consentState from backend
   const filteredRequests = useMemo(() => {
@@ -382,6 +446,38 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
       <div className="mb-12 bg-white/80 backdrop-blur-md border border-slate-200/15 rounded-lg p-6 shadow-lg">
         <h3 className="text-xl font-black text-slate-900 mb-4">Request Lifecycle</h3>
         
+        {/* Numerical Insights Stats Bar - Mobile */}
+        <div className="bg-slate-50/50 border border-slate-200/15 rounded-lg p-3 mb-4">
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div>
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Showing</div>
+              <div className="text-xl font-black text-slate-900">{filteredRequests.length}</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Violations</div>
+              <div className="text-xl font-black text-red-600">{filteredRequests.filter(r => r.category === 'critical').length}</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Pre-Consent</div>
+              <div className="text-xl font-black text-amber-600">{filteredRequests.filter(r => r.consentState === 'pre-consent').length}</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Data Weight</div>
+              <div className="text-xl font-black text-blue-600">
+                {Math.round(
+                  filteredRequests
+                    .filter(r => r.consentState === 'pre-consent' && r.category !== 'safe')
+                    .reduce((sum, r) => {
+                      const urlSize = r.url.length;
+                      const paramsSize = r.parameters ? JSON.stringify(r.parameters).length : 0;
+                      return sum + (urlSize + paramsSize) / 1024;
+                    }, 0)
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+        
         {/* Filter Toggle Bar - Mobile */}
         <div className="flex items-center gap-2 bg-slate-100/50 rounded-lg p-1 mb-4 overflow-x-auto">
           <button
@@ -416,8 +512,9 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
           </button>
         </div>
 
-        {/* Fixed Height Scroll Container */}
-        <div className="max-h-[500px] overflow-y-auto custom-scrollbar space-y-3">
+        {/* Fixed Height Scroll Container - Fix overflow during View Transitions */}
+        <div className="max-h-[500px] overflow-hidden border border-slate-200/15 rounded-lg">
+          <div className="h-full overflow-y-auto custom-scrollbar space-y-3 p-3" style={{ contain: 'layout paint' }}>
           {filteredRequests.map((req) => {
             const categoryColors = {
               critical: {
@@ -442,8 +539,15 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
             return (
               <div
                 key={req.id}
-                className={`min-h-[44px] p-4 rounded-lg border transition-all ${colors.bg} ${colors.border} ${colors.shadow}`}
-                style={{ viewTransitionName: `req-item-${req.id}` }}
+                className={`min-h-[44px] p-4 rounded-lg border transition-all ${
+                  req.category === 'critical' 
+                    ? 'bg-red-50/50 border-l-4 border-l-red-500 border-r border-t border-b border-red-200/50' 
+                    : `${colors.bg} ${colors.border}`
+                } ${colors.shadow}`}
+                style={{ 
+                  viewTransitionName: `req-item-${req.id}`,
+                  contain: 'layout paint'
+                }}
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-bold text-sm text-slate-900">{req.domain}</span>
@@ -476,6 +580,7 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
             <div className="text-xs text-center text-blue-100 font-medium">
               Pre-Consent above • Post-Consent below
             </div>
+          </div>
           </div>
         </div>
       </div>
@@ -523,8 +628,45 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
         </div>
       </div>
 
+      {/* Numerical Insights Stats Bar */}
+      <div className="bg-slate-50/50 border border-slate-200/15 rounded-lg p-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+          <div>
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Showing</div>
+            <div className="text-2xl font-black text-slate-900">{filteredRequests.length}</div>
+            <div className="text-xs text-slate-600">Requests</div>
+          </div>
+          <div>
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Violations</div>
+            <div className="text-2xl font-black text-red-600">{filteredRequests.filter(r => r.category === 'critical').length}</div>
+            <div className="text-xs text-slate-600">Critical</div>
+          </div>
+          <div>
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Pre-Consent</div>
+            <div className="text-2xl font-black text-amber-600">{filteredRequests.filter(r => r.consentState === 'pre-consent').length}</div>
+            <div className="text-xs text-slate-600">Total</div>
+          </div>
+          <div>
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Data Weight</div>
+            <div className="text-2xl font-black text-blue-600">
+              {Math.round(
+                filteredRequests
+                  .filter(r => r.consentState === 'pre-consent' && r.category !== 'safe')
+                  .reduce((sum, r) => {
+                    // Estimate payload size (rough calculation)
+                    const urlSize = r.url.length;
+                    const paramsSize = r.parameters ? JSON.stringify(r.parameters).length : 0;
+                    return sum + (urlSize + paramsSize) / 1024; // Convert to KB
+                  }, 0)
+              )}
+            </div>
+            <div className="text-xs text-slate-600">KB tracked</div>
+          </div>
+        </div>
+      </div>
+
       {/* Legend */}
-      <div className="flex items-center gap-4 mb-6 text-xs font-medium text-slate-600">
+      <div className="flex items-center gap-4 mb-6 text-xs font-medium text-slate-600 flex-wrap">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-red-500"></div>
           <span>Critical (Marketing/Tracking pre-consent)</span>
@@ -532,6 +674,18 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-amber-500"></div>
           <span>Warning (Potential fingerprinting)</span>
+          <div className="group relative">
+            <svg className="w-4 h-4 text-slate-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-64 p-3 bg-slate-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+              <div className="font-bold mb-1">Fingerprinting</div>
+              <div>Detecting unique browser traits (Canvas, User-Agent, AudioContext) to track you without cookies.</div>
+              <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                <div className="w-2 h-2 bg-slate-900 rotate-45"></div>
+              </div>
+            </div>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
@@ -539,9 +693,10 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
         </div>
       </div>
 
-      {/* Fixed Height Scroll Container */}
-      <div className="relative max-h-[500px] overflow-y-auto custom-scrollbar border border-slate-200/15 rounded-lg p-4">
-        <div className="relative min-h-[400px]">
+      {/* Fixed Height Scroll Container - Fix overflow during View Transitions */}
+      <div className="relative max-h-[500px] overflow-hidden border border-slate-200/15 rounded-lg">
+        <div className="h-full overflow-y-auto custom-scrollbar p-4" style={{ contain: 'layout paint' }}>
+          <div className="relative min-h-[400px]" style={{ contain: 'layout' }}>
           {/* Timeline */}
           <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-slate-200"></div>
           
@@ -667,7 +822,11 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
                     style={{ viewTransitionName: `req-item-${req.id}` }}
                   >
                     <div className={`absolute left-6 w-4 h-4 rounded-full border-2 border-white ${colors.dot} ${colors.ring}`}></div>
-                    <div className={`p-4 rounded-lg border min-h-[44px] ${colors.bg} ${colors.border} ${colors.shadow}`}>
+                    <div className={`p-4 rounded-lg border min-h-[44px] ${
+                      req.category === 'critical' 
+                        ? 'bg-red-50/50 border-l-4 border-l-red-500 border-r border-t border-b border-red-200/50' 
+                        : `${colors.bg} ${colors.border}`
+                    } ${colors.shadow}`}>
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
