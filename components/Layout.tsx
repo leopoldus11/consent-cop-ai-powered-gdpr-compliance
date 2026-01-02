@@ -97,7 +97,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                     setShowMobileMenu(!showMobileMenu);
                   }
                 }}
-                className="p-2 text-slate-600 hover:text-blue-600 transition-colors relative w-10 h-10 flex items-center justify-center z-50"
+                className={`p-2 text-slate-600 hover:text-blue-600 transition-colors relative w-10 h-10 flex items-center justify-center z-50 ${
+                  showMobileMenu ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                }`}
                 aria-label="Toggle menu"
               >
                 <div className="relative w-6 h-6">
@@ -237,6 +239,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
             style={{
               maxHeight: '100vh',
               overflowY: 'auto',
+              viewTransitionName: showMobileMenu ? 'mobile-menu' : undefined,
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -360,6 +363,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
             style={{
               maxHeight: '100vh',
               overflowY: 'auto',
+              viewTransitionName: showProfileModal ? 'profile-menu' : undefined,
             }}
             onClick={(e) => e.stopPropagation()}
           >
