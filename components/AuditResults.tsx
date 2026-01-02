@@ -697,11 +697,11 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
       <div className="relative max-h-[500px] overflow-hidden border border-slate-200/15 rounded-lg">
         <div className="h-full overflow-y-auto custom-scrollbar p-4" style={{ contain: 'layout paint' }}>
           <div className="relative min-h-[400px]" style={{ contain: 'layout' }}>
-          {/* Timeline */}
-          <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-slate-200"></div>
-          
-          {/* Requests - Split by consent timestamp */}
-          <div className="relative space-y-2">
+            {/* Timeline */}
+            <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-slate-200"></div>
+            
+            {/* Requests - Split by consent timestamp */}
+            <div className="relative space-y-2">
             {/* Pre-Consent Requests */}
             {filteredRequests
               .filter(req => req.consentState === 'pre-consent')
@@ -739,7 +739,11 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
                     style={{ viewTransitionName: `req-item-${req.id}` }}
                   >
                     <div className={`absolute left-6 w-4 h-4 rounded-full border-2 border-white ${colors.dot} ${colors.ring}`}></div>
-                    <div className={`p-4 rounded-lg border min-h-[44px] ${colors.bg} ${colors.border} ${colors.shadow}`}>
+                    <div className={`p-4 rounded-lg border min-h-[44px] ${
+                      req.category === 'critical' 
+                        ? 'bg-red-50/50 border-l-4 border-l-red-500 border-r border-t border-b border-red-200/50' 
+                        : `${colors.bg} ${colors.border}`
+                    } ${colors.shadow}`}>
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
@@ -854,6 +858,7 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
                   </div>
                 );
               })}
+            </div>
           </div>
         </div>
       </div>
