@@ -148,9 +148,25 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                     className="flex items-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-full transition-all"
                   >
                     {user.picture ? (
-                      <img src={user.picture} alt={user.name} className="w-8 h-8 rounded-full border-2 border-transparent hover:border-blue-200 transition-colors" />
+                      <img 
+                        src={user.picture} 
+                        alt={user.name} 
+                        className="w-10 h-10 rounded-full border-2 border-transparent hover:border-blue-200 transition-colors object-cover flex-shrink-0" 
+                        onError={(e) => {
+                          // Fallback to initials if image fails to load
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            const fallback = document.createElement('div');
+                            fallback.className = 'w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold border-2 border-transparent hover:border-blue-200 transition-colors';
+                            fallback.textContent = userInitials;
+                            parent.appendChild(fallback);
+                          }
+                        }}
+                      />
                     ) : (
-                      <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold border-2 border-transparent hover:border-blue-200 transition-colors">
+                      <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold border-2 border-transparent hover:border-blue-200 transition-colors flex-shrink-0">
                         {userInitials}
                       </div>
                     )}
