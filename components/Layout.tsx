@@ -65,7 +65,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
 
   return (
     <AuthProvider>
-      <div className="min-h-screen flex flex-col bg-slate-50">
+      <div className={`flex flex-col bg-slate-50 ${currentPage === 'home' ? 'h-[100dvh] lg:min-h-screen' : 'min-h-screen'}`}>
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50 safe-area-top">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
@@ -325,7 +325,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
         </div>
       </header>
 
-      <main className="flex-grow">
+      <main className={`flex-grow ${currentPage === 'home' ? 'overflow-hidden' : ''}`}>
         {children}
       </main>
 
@@ -483,7 +483,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
         </div>
       )}
 
-      <footer className="bg-white border-t border-slate-200 py-8 sm:py-12 lg:py-16">
+      <footer className={`bg-white border-t border-slate-200 py-8 sm:py-12 lg:py-16 ${currentPage === 'home' ? 'hidden lg:block' : ''}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Mobile: Compact layout with logo and 2-column grid */}
           <div className="lg:hidden space-y-6">
