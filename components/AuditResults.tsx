@@ -515,98 +515,152 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
       {/* Fixed Height Scroll Container */}
       <div className="relative max-h-[500px] overflow-y-auto custom-scrollbar border border-slate-200/15 rounded-lg p-4">
         <div className="relative min-h-[400px]">
-        {/* Timeline */}
-        <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-slate-200"></div>
-        
           {/* Timeline */}
           <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-slate-200"></div>
           
-          {/* Requests */}
+          {/* Requests - Split by consent timestamp */}
           <div className="relative space-y-2">
-            {filteredRequests.map((req) => {
-              const isPreConsent = req.timestamp < consentTimestamp;
-              const position = ((req.timestamp - minTime) / duration) * 100;
-              
-              // Get category colors
-              const categoryColors = {
-                critical: {
-                  bg: 'bg-red-50/50',
-                  border: 'border-red-200/50',
-                  dot: 'bg-red-500',
-                  ring: 'ring-4 ring-red-500/30',
-                  shadow: 'shadow-lg shadow-red-500/20'
-                },
-                warning: {
-                  bg: 'bg-amber-50/50',
-                  border: 'border-amber-200/50',
-                  dot: 'bg-amber-500',
-                  ring: '',
-                  shadow: ''
-                },
-                safe: {
-                  bg: 'bg-emerald-50/50',
-                  border: 'border-emerald-200/50',
-                  dot: 'bg-emerald-500',
-                  ring: '',
-                  shadow: ''
-                }
-              };
-              
-              const colors = categoryColors[req.category];
-              
-              return (
-                <div
-                  key={req.id}
-                  className="relative pl-16 py-2"
-                  style={{ marginTop: `${position * 0.1}px` }}
-                >
-                  <div className={`absolute left-6 w-4 h-4 rounded-full border-2 border-white ${colors.dot} ${colors.ring}`}></div>
-                  <div className={`p-4 rounded-lg border min-h-[44px] ${colors.bg} ${colors.border} ${colors.shadow}`}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-sm text-slate-900 truncate">{req.domain}</span>
-                          {req.category === 'critical' && (
-                            <span className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded">CRITICAL</span>
-                          )}
+            {/* Pre-Consent Requests */}
+            {filteredRequests
+              .filter(req => req.timestamp < consentTimestamp)
+              .map((req) => {
+                const categoryColors = {
+                  critical: {
+                    bg: 'bg-red-50/50',
+                    border: 'border-red-200/50',
+                    dot: 'bg-red-500',
+                    ring: 'ring-4 ring-red-500/30',
+                    shadow: 'shadow-lg shadow-red-500/20'
+                  },
+                  warning: {
+                    bg: 'bg-amber-50/50',
+                    border: 'border-amber-200/50',
+                    dot: 'bg-amber-500',
+                    ring: '',
+                    shadow: ''
+                  },
+                  safe: {
+                    bg: 'bg-emerald-50/50',
+                    border: 'border-emerald-200/50',
+                    dot: 'bg-emerald-500',
+                    ring: '',
+                    shadow: ''
+                  }
+                };
+                
+                const colors = categoryColors[req.category];
+                
+                return (
+                  <div key={req.id} className="relative pl-16 py-2">
+                    <div className={`absolute left-6 w-4 h-4 rounded-full border-2 border-white ${colors.dot} ${colors.ring}`}></div>
+                    <div className={`p-4 rounded-lg border min-h-[44px] ${colors.bg} ${colors.border} ${colors.shadow}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-bold text-sm text-slate-900 truncate">{req.domain}</span>
+                            {req.category === 'critical' && (
+                              <span className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded">CRITICAL</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-slate-600 font-mono truncate">{req.url}</div>
                         </div>
-                        <div className="text-xs text-slate-600 font-mono truncate">{req.url}</div>
-                      </div>
-                      <div className="flex items-center gap-2 ml-4">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          req.type === 'pixel' ? 'bg-blue-100 text-blue-700' :
-                          req.type === 'script' ? 'bg-purple-100 text-purple-700' :
-                          'bg-slate-100 text-slate-700'
-                        }`}>
-                          {req.type}
-                        </span>
-                        <span className="text-xs text-slate-500 whitespace-nowrap">
-                          +{((req.timestamp - minTime) / 1000).toFixed(2)}s
-                        </span>
+                        <div className="flex items-center gap-2 ml-4">
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            req.type === 'pixel' ? 'bg-blue-100 text-blue-700' :
+                            req.type === 'script' ? 'bg-purple-100 text-purple-700' :
+                            'bg-slate-100 text-slate-700'
+                          }`}>
+                            {req.type}
+                          </span>
+                          <span className="text-xs text-slate-500 whitespace-nowrap">
+                            +{((req.timestamp - minTime) / 1000).toFixed(2)}s
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* CONSENT GATE Divider - Bold Horizontal */}
-          {filteredRequests.some(r => r.timestamp >= consentTimestamp) && filteredRequests.some(r => r.timestamp < consentTimestamp) && (
-            <div className="relative my-6">
-              <div className="absolute left-6 w-4 h-4 rounded-full bg-blue-600 border-2 border-white ring-4 ring-blue-500/30 z-20"></div>
-              <div className="ml-16 bg-white/95 backdrop-blur-sm border-y-2 border-blue-600 py-3 rounded-lg">
-                <div className="flex items-center justify-center mb-2">
-                  <div className="bg-blue-600 text-white px-6 py-2 rounded-lg text-base font-black uppercase tracking-wider">
-                    CONSENT GATE
+                );
+              })}
+            
+            {/* CONSENT GATE Divider - Bold Horizontal */}
+            {filteredRequests.some(r => r.timestamp >= consentTimestamp) && filteredRequests.some(r => r.timestamp < consentTimestamp) && (
+              <div className="relative my-6">
+                <div className="absolute left-6 w-4 h-4 rounded-full bg-blue-600 border-2 border-white ring-4 ring-blue-500/30 z-20"></div>
+                <div className="ml-16 bg-white/95 backdrop-blur-sm border-y-2 border-blue-600 py-3 rounded-lg">
+                  <div className="flex items-center justify-center mb-2">
+                    <div className="bg-blue-600 text-white px-6 py-2 rounded-lg text-base font-black uppercase tracking-wider">
+                      CONSENT GATE
+                    </div>
+                  </div>
+                  <div className="text-xs text-center text-slate-500 font-medium">
+                    Everything above is Pre-Consent • Everything below is Post-Consent Simulation
                   </div>
                 </div>
-                <div className="text-xs text-center text-slate-500 font-medium">
-                  Everything above is Pre-Consent • Everything below is Post-Consent Simulation
-                </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {/* Post-Consent Requests */}
+            {filteredRequests
+              .filter(req => req.timestamp >= consentTimestamp)
+              .map((req) => {
+                const categoryColors = {
+                  critical: {
+                    bg: 'bg-red-50/50',
+                    border: 'border-red-200/50',
+                    dot: 'bg-red-500',
+                    ring: 'ring-4 ring-red-500/30',
+                    shadow: 'shadow-lg shadow-red-500/20'
+                  },
+                  warning: {
+                    bg: 'bg-amber-50/50',
+                    border: 'border-amber-200/50',
+                    dot: 'bg-amber-500',
+                    ring: '',
+                    shadow: ''
+                  },
+                  safe: {
+                    bg: 'bg-emerald-50/50',
+                    border: 'border-emerald-200/50',
+                    dot: 'bg-emerald-500',
+                    ring: '',
+                    shadow: ''
+                  }
+                };
+                
+                const colors = categoryColors[req.category];
+                
+                return (
+                  <div key={req.id} className="relative pl-16 py-2">
+                    <div className={`absolute left-6 w-4 h-4 rounded-full border-2 border-white ${colors.dot} ${colors.ring}`}></div>
+                    <div className={`p-4 rounded-lg border min-h-[44px] ${colors.bg} ${colors.border} ${colors.shadow}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-bold text-sm text-slate-900 truncate">{req.domain}</span>
+                            {req.category === 'critical' && (
+                              <span className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded">CRITICAL</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-slate-600 font-mono truncate">{req.url}</div>
+                        </div>
+                        <div className="flex items-center gap-2 ml-4">
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            req.type === 'pixel' ? 'bg-blue-100 text-blue-700' :
+                            req.type === 'script' ? 'bg-purple-100 text-purple-700' :
+                            'bg-slate-100 text-slate-700'
+                          }`}>
+                            {req.type}
+                          </span>
+                          <span className="text-xs text-slate-500 whitespace-nowrap">
+                            +{((req.timestamp - minTime) / 1000).toFixed(2)}s
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
         </div>
       </div>
     </div>
