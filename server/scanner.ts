@@ -592,8 +592,8 @@ export async function scanWebsite(
       });
     }
 
-    // Process requests into RequestLog format
-    const allRequestLogs = processRequests(requestsBefore, requestsAfter, bannerProvider);
+    // Process requests into RequestLog format with consentState tagging
+    const allRequestLogs = processRequests(requestsBefore, requestsAfter, bannerProvider, consentClickTimestamp);
 
     // Separate violations from compliant requests
     const violations = allRequestLogs.filter(r => r.status === 'violation');
@@ -957,7 +957,8 @@ async function tryClickConsentBanner(page: Page): Promise<{ clicked: boolean; ti
 function processRequests(
   requestsBefore: NetworkRequest[],
   requestsAfter: NetworkRequest[],
-  cmpProvider: string | null
+  cmpProvider: string | null,
+  consentClickTimestamp: number | null
 ): RequestLog[] {
   console.log(`[PROCESS] Processing ${requestsBefore.length} before + ${requestsAfter.length} after requests`);
   const requestLogs: RequestLog[] = [];
@@ -1016,6 +1017,7 @@ function processRequests(
         status: isViolation ? 'violation' : 'allowed',
         dataTypes: inferDataTypes(req.url, req.headers, req.postData),
         parameters: extractParameters(req.url, req.postData),
+        consentState: 'pre-consent', // Tagged based on consentClickTimestamp
       });
     } catch (error) {
       skippedCount++;
@@ -1045,6 +1047,7 @@ function processRequests(
         status: 'allowed',
         dataTypes: inferDataTypes(req.url, req.headers, req.postData),
         parameters: extractParameters(req.url, req.postData),
+        consentState: 'post-consent', // Tagged based on consentClickTimestamp
       });
     } catch (error) {
       // Skip invalid URLs

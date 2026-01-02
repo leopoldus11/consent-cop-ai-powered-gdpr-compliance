@@ -10,6 +10,7 @@ export interface RequestLog {
   status: 'allowed' | 'violation';
   dataTypes: string[];
   parameters?: Record<string, string>;
+  consentState: 'pre-consent' | 'post-consent'; // Tagged based on consentClickTimestamp
 }
 
 export interface ScanResult {

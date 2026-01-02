@@ -21,12 +21,9 @@ export const AuditResults: React.FC<AuditResultsProps> = ({
   // riskScore is typically 0-100 where higher = worse, so we invert it
   const complianceScore = Math.max(0, Math.min(100, 100 - result.riskScore));
   
-  // Calculate summary metrics
+  // Calculate summary metrics using consentState
   const totalPreConsentRequests = useMemo(() => {
-    const sorted = [...result.requests].sort((a, b) => a.timestamp - b.timestamp);
-    const firstAllowed = sorted.find(r => r.status === 'allowed');
-    const consentTimestamp = firstAllowed?.timestamp || sorted[sorted.length - 1]?.timestamp || 0;
-    return result.requests.filter(r => r.timestamp < consentTimestamp).length;
+    return result.requests.filter(r => r.consentState === 'pre-consent').length;
   }, [result.requests]);
 
   const nonCompliantTrackers = result.violationsCount;
@@ -35,11 +32,11 @@ export const AuditResults: React.FC<AuditResultsProps> = ({
   const cmpResponseCode = result.consentBannerDetected ? '200' : '404';
   const cmpStatus = result.consentBannerDetected ? 'Detected' : 'Not Detected';
 
-  // Find consent event timestamp
+  // Find consent event timestamp from first post-consent request
   const consentTimestamp = useMemo(() => {
     const sorted = [...result.requests].sort((a, b) => a.timestamp - b.timestamp);
-    const firstAllowed = sorted.find(r => r.status === 'allowed');
-    return firstAllowed?.timestamp || sorted[sorted.length - 1]?.timestamp || 0;
+    const firstPostConsent = sorted.find(r => r.consentState === 'post-consent');
+    return firstPostConsent?.timestamp || sorted[sorted.length - 1]?.timestamp || 0;
   }, [result.requests]);
 
   // Group AI analysis by severity for Audit Findings
@@ -65,13 +62,28 @@ export const AuditResults: React.FC<AuditResultsProps> = ({
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        {/* Hero Scorecard Section */}
+        {/* Hero Scorecard Section - Bento Layout */}
         <div className="mb-12">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Circular Compliance Score */}
-            <div className="lg:col-span-1">
-              <div className="bg-white/80 backdrop-blur-md border border-slate-200/15 rounded-lg p-8 shadow-lg flex flex-col items-center justify-center min-h-[280px]">
-                <div className="relative w-48 h-48 mb-6">
+          {/* Bento Grid: 2x2 for score, 1x1 for metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Circular Compliance Score - 2x2 (spans 2 columns on desktop) */}
+            <div className="md:col-span-2 md:row-span-2">
+              <div className={`h-full bg-gradient-to-br ${
+                complianceScore >= 80 
+                  ? 'from-emerald-50/80 to-green-50/80' 
+                  : complianceScore >= 50
+                  ? 'from-amber-50/80 to-orange-50/80'
+                  : 'from-red-50/80 to-rose-50/80'
+              } backdrop-blur-md border border-slate-200/15 rounded-lg p-8 shadow-lg flex flex-col items-center justify-center min-h-[400px] relative overflow-hidden`}>
+                {/* Inner glow for failed audits */}
+                {complianceScore < 50 && (
+                  <div className="absolute inset-0 bg-red-500/10 blur-3xl"></div>
+                )}
+                {/* Soft blue gradient for compliant sections */}
+                {complianceScore >= 80 && (
+                  <div className="absolute inset-0 bg-blue-500/5 blur-3xl"></div>
+                )}
+                <div className="relative z-10 w-48 h-48 mb-6">
                   <svg className="transform -rotate-90 w-full h-full">
                     <circle
                       cx="96"
@@ -104,55 +116,58 @@ export const AuditResults: React.FC<AuditResultsProps> = ({
                     </span>
                   </div>
                 </div>
-                <h3 className="text-lg font-black text-slate-900 text-center">
+                <h3 className="text-lg font-black text-slate-900 text-center relative z-10">
                   Compliance Score
                 </h3>
               </div>
             </div>
 
-            {/* Three Summary Cards */}
-            <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-6">
-              {/* Total Pre-Consent Requests */}
-              <div className="bg-white/80 backdrop-blur-md border border-slate-200/15 rounded-lg p-6 shadow-lg">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-lg bg-blue-50 flex items-center justify-center">
-                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  </div>
+            {/* Total Pre-Consent Requests - 1x1 */}
+            <div className="bg-white/80 backdrop-blur-md border border-slate-200/15 rounded-lg p-6 shadow-lg">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 rounded-lg bg-blue-50 flex items-center justify-center">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
                 </div>
-                <div className="text-3xl font-black text-slate-900 mb-1">{totalPreConsentRequests}</div>
-                <div className="text-sm font-medium text-slate-600">Total Pre-Consent Requests</div>
               </div>
-
-              {/* Non-Compliant Trackers */}
-              <div className="bg-white/80 backdrop-blur-md border border-slate-200/15 rounded-lg p-6 shadow-lg">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-lg bg-red-50 flex items-center justify-center">
-                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="text-3xl font-black text-slate-900 mb-1">{nonCompliantTrackers}</div>
-                <div className="text-sm font-medium text-slate-600">Non-Compliant Trackers</div>
-              </div>
-
-              {/* CMP Response Code */}
-              <div className="bg-white/80 backdrop-blur-md border border-slate-200/15 rounded-lg p-6 shadow-lg">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-lg bg-emerald-50 flex items-center justify-center">
-                    <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="text-3xl font-black text-slate-900 mb-1">{cmpResponseCode}</div>
-                <div className="text-sm font-medium text-slate-600">CMP Response: {cmpStatus}</div>
-              </div>
+              <div className="text-3xl font-black text-slate-900 mb-1">{totalPreConsentRequests}</div>
+              <div className="text-sm font-medium text-slate-600">Total Pre-Consent Requests</div>
             </div>
+
+            {/* Non-Compliant Trackers - 1x1 */}
+            <div className="bg-white/80 backdrop-blur-md border border-slate-200/15 rounded-lg p-6 shadow-lg relative overflow-hidden">
+              {/* Inner glow for failed audits */}
+              {nonCompliantTrackers > 0 && (
+                <div className="absolute inset-0 bg-red-500/10 blur-2xl"></div>
+              )}
+              <div className="relative z-10 flex items-center justify-between mb-4">
+                <div className="w-12 h-12 rounded-lg bg-red-50 flex items-center justify-center">
+                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+              </div>
+              <div className="text-3xl font-black text-slate-900 mb-1 relative z-10">{nonCompliantTrackers}</div>
+              <div className="text-sm font-medium text-slate-600 relative z-10">Non-Compliant Trackers</div>
+            </div>
+
+            {/* CMP Response Code - 1x1 */}
+            <div className="bg-gradient-to-br from-blue-50/80 to-indigo-50/80 backdrop-blur-md border border-slate-200/15 rounded-lg p-6 shadow-lg relative overflow-hidden">
+              {/* Soft blue gradient for compliant sections */}
+              <div className="absolute inset-0 bg-blue-500/5 blur-2xl"></div>
+              <div className="relative z-10 flex items-center justify-between mb-4">
+                <div className="w-12 h-12 rounded-lg bg-emerald-50 flex items-center justify-center">
+                  <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+              <div className="text-3xl font-black text-slate-900 mb-1 relative z-10">{cmpResponseCode}</div>
+              <div className="text-sm font-medium text-slate-600 relative z-10">CMP Response: {cmpStatus}</div>
+            </div>
+          </div>
         </div>
-      </div>
 
         {/* Data Layer & Badges Section - Top Fold */}
         <DataLayerBadges 
@@ -226,35 +241,35 @@ const DataLayerBadges: React.FC<DataLayerBadgesProps> = ({ result }) => {
     <div className="mb-12 bg-white/80 backdrop-blur-md border border-slate-200/15 rounded-lg p-6 shadow-lg">
       <h3 className="text-lg font-black text-slate-900 mb-6">Technology Stack</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* CMS/CMP Badge */}
+        {/* CMS/CMP Badge - High-Contrast Pill */}
         {result.bannerProvider && (
-          <div className="flex items-center gap-3 p-4 bg-slate-50/50 rounded-lg border border-slate-200/15">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50 flex-shrink-0"></div>
+          <div className="flex items-center gap-3 p-4 bg-slate-900 rounded-lg border-2 border-slate-700 shadow-lg">
+            <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50 flex-shrink-0 animate-pulse"></div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">CMP</div>
-              <div className="font-mono text-sm font-bold text-slate-900 truncate">{result.bannerProvider}</div>
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">CMP</div>
+              <div className="font-mono text-sm font-black text-white truncate" style={{ fontFamily: 'JetBrains Mono, Roboto Mono, monospace' }}>{result.bannerProvider}</div>
             </div>
           </div>
         )}
 
-        {/* TMS Badge */}
+        {/* TMS Badge - High-Contrast Pill */}
         {result.tmsDetected.length > 0 && (
-          <div className="flex items-center gap-3 p-4 bg-slate-50/50 rounded-lg border border-slate-200/15">
-            <div className="w-2 h-2 rounded-full bg-blue-500 shadow-lg shadow-blue-500/50 flex-shrink-0"></div>
+          <div className="flex items-center gap-3 p-4 bg-slate-900 rounded-lg border-2 border-slate-700 shadow-lg">
+            <div className="w-3 h-3 rounded-full bg-blue-500 shadow-lg shadow-blue-500/50 flex-shrink-0"></div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">TMS</div>
-              <div className="font-mono text-sm font-bold text-slate-900 truncate">{result.tmsDetected[0]}</div>
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">TMS</div>
+              <div className="font-mono text-sm font-black text-white truncate" style={{ fontFamily: 'JetBrains Mono, Roboto Mono, monospace' }}>{result.tmsDetected[0]}</div>
             </div>
           </div>
         )}
 
-        {/* Data Layers */}
+        {/* Data Layers - High-Contrast Pills with Pulsing Green Dot */}
         {result.dataLayers.map((dl, idx) => (
-          <div key={idx} className="flex items-center gap-3 p-4 bg-slate-50/50 rounded-lg border border-slate-200/15">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50 flex-shrink-0 animate-pulse"></div>
+          <div key={idx} className="flex items-center gap-3 p-4 bg-slate-900 rounded-lg border-2 border-slate-700 shadow-lg">
+            <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50 flex-shrink-0 animate-pulse"></div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Data Layer</div>
-              <div className="font-mono text-sm font-bold text-slate-900 truncate">{dl}</div>
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Data Layer</div>
+              <div className="font-mono text-sm font-black text-white truncate" style={{ fontFamily: 'JetBrains Mono, Roboto Mono, monospace' }}>{dl}</div>
             </div>
           </div>
         ))}
@@ -280,10 +295,10 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
   const maxTime = sortedRequests[sortedRequests.length - 1]?.timestamp || minTime;
   const duration = maxTime - minTime || 1;
 
-  // Categorize requests by compliance status
+  // Categorize requests by compliance status - use consentState from backend
   const categorizedRequests = useMemo(() => {
     return sortedRequests.map(req => {
-      const isPreConsent = req.timestamp < consentTimestamp;
+      const isPreConsent = req.consentState === 'pre-consent';
       const isViolation = req.status === 'violation';
       
       // Red (Critical): Marketing/Tracking pixel fired before Consent Gate
@@ -301,16 +316,16 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
     });
   }, [sortedRequests, consentTimestamp]);
 
-  // Apply filter
+  // Apply filter - use consentState from backend
   const filteredRequests = useMemo(() => {
     if (filter === 'violations') {
       return categorizedRequests.filter(r => r.status === 'violation');
     }
     if (filter === 'pre-consent') {
-      return categorizedRequests.filter(r => r.timestamp < consentTimestamp);
+      return categorizedRequests.filter(r => r.consentState === 'pre-consent');
     }
     return categorizedRequests;
-  }, [categorizedRequests, filter, consentTimestamp]);
+  }, [categorizedRequests, filter]);
 
   // Add custom scrollbar styles
   useEffect(() => {
@@ -359,7 +374,7 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
         {/* Filter Toggle Bar - Mobile */}
         <div className="flex items-center gap-2 bg-slate-100/50 rounded-lg p-1 mb-4 overflow-x-auto">
           <button
-            onClick={() => setFilter('all')}
+            onClick={() => handleFilterChange('all')}
             className={`px-3 py-2 rounded-lg text-xs font-bold transition-all min-h-[44px] whitespace-nowrap ${
               filter === 'all' 
                 ? 'bg-white text-slate-900 shadow-sm' 
@@ -369,7 +384,7 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
             All
           </button>
           <button
-            onClick={() => setFilter('violations')}
+            onClick={() => handleFilterChange('violations')}
             className={`px-3 py-2 rounded-lg text-xs font-bold transition-all min-h-[44px] whitespace-nowrap ${
               filter === 'violations' 
                 ? 'bg-white text-slate-900 shadow-sm' 
@@ -379,7 +394,7 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
             Violations
           </button>
           <button
-            onClick={() => setFilter('pre-consent')}
+            onClick={() => handleFilterChange('pre-consent')}
             className={`px-3 py-2 rounded-lg text-xs font-bold transition-all min-h-[44px] whitespace-nowrap ${
               filter === 'pre-consent' 
                 ? 'bg-white text-slate-900 shadow-sm' 
@@ -417,6 +432,7 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
               <div
                 key={req.id}
                 className={`min-h-[44px] p-4 rounded-lg border transition-all ${colors.bg} ${colors.border} ${colors.shadow}`}
+                style={{ viewTransitionName: `req-item-${req.id}` }}
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-bold text-sm text-slate-900">{req.domain}</span>
@@ -464,7 +480,7 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
         {/* Filter Toggle Bar */}
         <div className="flex items-center gap-2 bg-slate-100/50 rounded-lg p-1">
           <button
-            onClick={() => setFilter('all')}
+            onClick={() => handleFilterChange('all')}
             className={`px-4 py-2 rounded-lg text-sm font-bold transition-all min-h-[44px] ${
               filter === 'all' 
                 ? 'bg-white text-slate-900 shadow-sm' 
@@ -474,7 +490,7 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
             All
           </button>
           <button
-            onClick={() => setFilter('violations')}
+            onClick={() => handleFilterChange('violations')}
             className={`px-4 py-2 rounded-lg text-sm font-bold transition-all min-h-[44px] ${
               filter === 'violations' 
                 ? 'bg-white text-slate-900 shadow-sm' 
@@ -484,7 +500,7 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
             Violations Only
           </button>
           <button
-            onClick={() => setFilter('pre-consent')}
+            onClick={() => handleFilterChange('pre-consent')}
             className={`px-4 py-2 rounded-lg text-sm font-bold transition-all min-h-[44px] ${
               filter === 'pre-consent' 
                 ? 'bg-white text-slate-900 shadow-sm' 
@@ -522,7 +538,7 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
           <div className="relative space-y-2">
             {/* Pre-Consent Requests */}
             {filteredRequests
-              .filter(req => req.timestamp < consentTimestamp)
+              .filter(req => req.consentState === 'pre-consent')
               .map((req) => {
                 const categoryColors = {
                   critical: {
@@ -551,7 +567,11 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
                 const colors = categoryColors[req.category];
                 
                 return (
-                  <div key={req.id} className="relative pl-16 py-2">
+                  <div 
+                    key={req.id} 
+                    className="relative pl-16 py-2"
+                    style={{ viewTransitionName: `req-item-${req.id}` }}
+                  >
                     <div className={`absolute left-6 w-4 h-4 rounded-full border-2 border-white ${colors.dot} ${colors.ring}`}></div>
                     <div className={`p-4 rounded-lg border min-h-[44px] ${colors.bg} ${colors.border} ${colors.shadow}`}>
                       <div className="flex items-center justify-between">
@@ -583,7 +603,7 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
               })}
             
             {/* CONSENT GATE Divider - Bold Horizontal */}
-            {filteredRequests.some(r => r.timestamp >= consentTimestamp) && filteredRequests.some(r => r.timestamp < consentTimestamp) && (
+            {filteredRequests.some(r => r.consentState === 'post-consent') && filteredRequests.some(r => r.consentState === 'pre-consent') && (
               <div className="relative my-6">
                 <div className="absolute left-6 w-4 h-4 rounded-full bg-blue-600 border-2 border-white ring-4 ring-blue-500/30 z-20"></div>
                 <div className="ml-16 bg-white/95 backdrop-blur-sm border-y-2 border-blue-600 py-3 rounded-lg">
@@ -601,7 +621,7 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
 
             {/* Post-Consent Requests */}
             {filteredRequests
-              .filter(req => req.timestamp >= consentTimestamp)
+              .filter(req => req.consentState === 'post-consent')
               .map((req) => {
                 const categoryColors = {
                   critical: {
@@ -630,7 +650,11 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
                 const colors = categoryColors[req.category];
                 
                 return (
-                  <div key={req.id} className="relative pl-16 py-2">
+                  <div 
+                    key={req.id} 
+                    className="relative pl-16 py-2"
+                    style={{ viewTransitionName: `req-item-${req.id}` }}
+                  >
                     <div className={`absolute left-6 w-4 h-4 rounded-full border-2 border-white ${colors.dot} ${colors.ring}`}></div>
                     <div className={`p-4 rounded-lg border min-h-[44px] ${colors.bg} ${colors.border} ${colors.shadow}`}>
                       <div className="flex items-center justify-between">
