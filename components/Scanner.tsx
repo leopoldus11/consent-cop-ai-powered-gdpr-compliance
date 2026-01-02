@@ -176,6 +176,8 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
           )}
         </button>
       </form>
+        </div>
+      </div>
       
       {/* Technology Stack - Hidden on Mobile, Shown on Desktop */}
       <div className="hidden sm:flex items-center justify-center gap-3 lg:gap-4 mt-6 lg:mt-8 text-xs lg:text-sm text-slate-400 font-medium uppercase tracking-widest">
@@ -184,7 +186,6 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
         <span>Protocol-Level Interception</span>
         <span className="text-slate-300">•</span>
         <span>AI-Powered Risk Analysis</span>
-      </div>
       </div>
     </div>
   );
