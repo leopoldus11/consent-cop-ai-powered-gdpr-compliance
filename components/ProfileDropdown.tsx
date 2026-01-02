@@ -25,7 +25,10 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ user, onLogout
   return (
     <div
       ref={dropdownRef}
-      className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-2"
+      className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 transition-all duration-300 ease-out animate-in fade-in slide-in-from-top-2"
+      style={{
+        viewTransitionName: 'profile-dropdown'
+      }}
     >
       <div className="px-4 py-3 border-b border-slate-100">
         <div className="text-sm font-bold text-slate-900 truncate">{user.name}</div>

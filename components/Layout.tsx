@@ -144,7 +144,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
               {user ? (
                 <div className="relative">
                   <button
-                    onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                    onClick={() => {
+                      if ('startViewTransition' in document) {
+                        (document as any).startViewTransition(() => {
+                          setShowProfileDropdown(!showProfileDropdown);
+                        });
+                      } else {
+                        setShowProfileDropdown(!showProfileDropdown);
+                      }
+                    }}
                     className="flex items-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-full transition-all"
                   >
                     {user.picture ? (
@@ -545,12 +553,37 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
       )}
 
       {/* Settings Modal */}
-      {showSettings && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 border border-slate-100">
+      <div 
+        className={`fixed inset-0 z-[100] flex items-center justify-center p-6 transition-all duration-300 ease-out ${
+          showSettings 
+            ? 'opacity-100 visible backdrop-blur-sm' 
+            : 'opacity-0 invisible pointer-events-none'
+        }`}
+        style={{
+          backgroundColor: showSettings ? 'rgba(15, 23, 42, 0.6)' : 'transparent'
+        }}
+      >
+        <div 
+          className={`bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 border border-slate-100 transition-all duration-300 ease-out ${
+            showSettings 
+              ? 'opacity-100 scale-100 translate-y-0' 
+              : 'opacity-0 scale-95 translate-y-4'
+          }`}
+        >
              <div className="flex justify-between items-center mb-6">
                 <h2 className="text-lg font-black text-slate-900">Advanced Settings</h2>
-                <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-slate-600">
+                <button 
+                  onClick={() => {
+                    if ('startViewTransition' in document) {
+                      (document as any).startViewTransition(() => {
+                        setShowSettings(false);
+                      });
+                    } else {
+                      setShowSettings(false);
+                    }
+                  }} 
+                  className="text-slate-400 hover:text-slate-600"
+                >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
              </div>
@@ -568,7 +601,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                     By providing your own key, you get unlimited weekly scans. Your key is stored locally in your browser only.
                   </p>
                 </div>
-                <button onClick={() => setShowSettings(false)} className="w-full bg-slate-900 text-white font-black py-3 rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-slate-200 hover:bg-blue-600 transition-colors">
+                <button 
+                  onClick={() => {
+                    if ('startViewTransition' in document) {
+                      (document as any).startViewTransition(() => {
+                        setShowSettings(false);
+                      });
+                    } else {
+                      setShowSettings(false);
+                    }
+                  }} 
+                  className="w-full bg-slate-900 text-white font-black py-3 rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-slate-200 hover:bg-blue-600 transition-colors"
+                >
                   Save Configuration
                 </button>
              </div>
