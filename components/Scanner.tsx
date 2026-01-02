@@ -211,7 +211,7 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
             Automatically detect consent violations, track pre-consent pixel firing, and get AI-powered remediation advice. Built for DPOs, developers, and compliance teams.
           </p>
           <p className="sm:hidden text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
-            Detect consent violations and get AI-powered remediation advice.
+            Detect consent violations and get<br className="sm:hidden" /> AI-powered remediation advice.
           </p>
           
           {/* Value Props - Simplified for Mobile */}
