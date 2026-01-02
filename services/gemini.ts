@@ -57,21 +57,54 @@ export const analyzeScanResult = async (result: ScanResult, options?: { useCache
   const model = useFlashModel ? 'gemini-1.5-flash' : 'gemini-3-pro-preview';
   console.log(`[AI] Using model: ${model} for analysis of ${result.url}`);
   
-  const prompt = `Act as a Senior Data Privacy Consultant. Analyze this GDPR compliance scan for ${result.url}. 
+  // Build network log summary for analysis
+  const preConsentRequests = result.requests.filter(r => {
+    const sorted = [...result.requests].sort((a, b) => a.timestamp - b.timestamp);
+    const firstAllowed = sorted.find(req => req.status === 'allowed');
+    const consentTime = firstAllowed?.timestamp || sorted[sorted.length - 1]?.timestamp || 0;
+    return r.timestamp < consentTime;
+  });
   
-  IMPORTANT: This is a technical scan result. Do NOT make definitive legal claims. Use cautious language like "may indicate", "potential", "appears to", "suggests" rather than definitive statements.
-  
-  Scan Context:
-  - Potential Violations: ${result.violationsCount} (Requests detected before user interaction)
+  const networkLogSummary = preConsentRequests
+    .slice(0, 50) // Limit to first 50 for prompt size
+    .map(r => ({
+      domain: r.domain,
+      type: r.type,
+      status: r.status,
+      dataTypes: r.dataTypes,
+      timestamp: r.timestamp
+    }));
+
+  const prompt = `You are a Senior DPO (Data Protection Officer). Analyze this network log. Do not just summarize. Identify specific GDPR Article 6 violations. 
+
+  Scan Context for ${result.url}:
+  - Pre-Consent Violations: ${result.violationsCount}
   - Total Requests: ${result.requests.length}
-  - Technologies Detected: ${result.tmsDetected.join(', ')} / ${result.bannerProvider || 'No CMP detected'}.
+  - CMP Detected: ${result.bannerProvider || 'None'}
+  - TMS Detected: ${result.tmsDetected.join(', ') || 'None'}
   
-  Your output MUST be strictly professional, cautious, and structured. 
-  1. Executive Summary: High-level business impact using cautious language. Note that these are technical findings that require legal review.
-  2. Severity: Choose based on count and type of PII potentially leaked. Use "Potential" or "Possible" severity.
-  3. Remediation: 3 clear technical steps as recommendations.
-  4. Legal Context: Reference specific GDPR articles (e.g., Art. 5, Art. 7, ePrivacy Directive) but note that actual compliance requires review of the site's privacy policy and legal framework.
-  5. Disclaimer: A standard text stating this is an AI tool, not legal advice, and findings should be verified with legal counsel and the site's privacy policy.`;
+  Network Log (Pre-Consent Requests):
+  ${JSON.stringify(networkLogSummary, null, 2)}
+  
+  Your analysis MUST be structured and actionable:
+  
+  1. Executive Summary: Identify specific GDPR Article 6 violations. Group results by:
+     - Unlocked Pixels (Pre-consent): Marketing/tracking pixels that fired before consent
+     - Piggybacking Trackers: Third-party scripts that load additional trackers
+     - PII Leakage in URLs: Personal identifiers found in request parameters
+  
+  2. Severity Assessment: Based on actual violations found (Critical/High/Medium/Low)
+  
+  3. Remediation Steps: Provide 3-5 specific technical remediation steps with priority:
+     - Immediate: Critical violations requiring immediate action
+     - Next: Important fixes to implement soon
+     - Soon: Recommended improvements
+  
+  4. Legal Context: Reference specific GDPR articles violated (e.g., Art. 6(1), Art. 7, ePrivacy Directive Art. 5(3))
+  
+  5. Disclaimer: Standard text noting this is technical analysis requiring legal review.
+  
+  Return strictly valid JSON matching the schema.`;
 
   const response = await ai.models.generateContent({
     model: model,

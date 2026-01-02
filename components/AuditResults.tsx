@@ -128,7 +128,7 @@ export const AuditResults: React.FC<AuditResultsProps> = ({
               {/* Non-Compliant Trackers */}
               <div className="bg-white/80 backdrop-blur-md border border-slate-200/15 rounded-lg p-6 shadow-lg">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-lg bg-red-50 flex items-center justify-center">
                     <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
@@ -141,7 +141,7 @@ export const AuditResults: React.FC<AuditResultsProps> = ({
               {/* CMP Response Code */}
               <div className="bg-white/80 backdrop-blur-md border border-slate-200/15 rounded-lg p-6 shadow-lg">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-lg bg-emerald-50 flex items-center justify-center">
                     <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -151,8 +151,13 @@ export const AuditResults: React.FC<AuditResultsProps> = ({
                 <div className="text-sm font-medium text-slate-600">CMP Response: {cmpStatus}</div>
               </div>
             </div>
-          </div>
         </div>
+      </div>
+
+        {/* Data Layer & Badges Section - Top Fold */}
+        <DataLayerBadges 
+          result={result}
+        />
 
         {/* Lifecycle Waterfall Section */}
         <LifecycleWaterfall 
@@ -206,6 +211,58 @@ export const AuditResults: React.FC<AuditResultsProps> = ({
   );
 };
 
+// Data Layer & Badges Component
+interface DataLayerBadgesProps {
+  result: ScanResult;
+}
+
+const DataLayerBadges: React.FC<DataLayerBadgesProps> = ({ result }) => {
+  // Only render if we have data
+  if (!result.dataLayers.length && !result.tmsDetected.length && !result.bannerProvider) {
+    return null;
+  }
+
+  return (
+    <div className="mb-12 bg-white/80 backdrop-blur-md border border-slate-200/15 rounded-lg p-6 shadow-lg">
+      <h3 className="text-lg font-black text-slate-900 mb-6">Technology Stack</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* CMS/CMP Badge */}
+        {result.bannerProvider && (
+          <div className="flex items-center gap-3 p-4 bg-slate-50/50 rounded-lg border border-slate-200/15">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50 flex-shrink-0"></div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">CMP</div>
+              <div className="font-mono text-sm font-bold text-slate-900 truncate">{result.bannerProvider}</div>
+            </div>
+          </div>
+        )}
+
+        {/* TMS Badge */}
+        {result.tmsDetected.length > 0 && (
+          <div className="flex items-center gap-3 p-4 bg-slate-50/50 rounded-lg border border-slate-200/15">
+            <div className="w-2 h-2 rounded-full bg-blue-500 shadow-lg shadow-blue-500/50 flex-shrink-0"></div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">TMS</div>
+              <div className="font-mono text-sm font-bold text-slate-900 truncate">{result.tmsDetected[0]}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Data Layers */}
+        {result.dataLayers.map((dl, idx) => (
+          <div key={idx} className="flex items-center gap-3 p-4 bg-slate-50/50 rounded-lg border border-slate-200/15">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50 flex-shrink-0 animate-pulse"></div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Data Layer</div>
+              <div className="font-mono text-sm font-bold text-slate-900 truncate">{dl}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // Lifecycle Waterfall Component
 interface LifecycleWaterfallProps {
   requests: RequestLog[];
@@ -213,6 +270,8 @@ interface LifecycleWaterfallProps {
 }
 
 const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, consentTimestamp }) => {
+  const [filter, setFilter] = useState<'all' | 'violations' | 'pre-consent'>('all');
+
   const sortedRequests = useMemo(() => {
     return [...requests].sort((a, b) => a.timestamp - b.timestamp);
   }, [requests]);
@@ -221,14 +280,37 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
   const maxTime = sortedRequests[sortedRequests.length - 1]?.timestamp || minTime;
   const duration = maxTime - minTime || 1;
 
-  // Check for high-risk marketing scripts before consent
-  const highRiskRequests = useMemo(() => {
-    return sortedRequests.filter(req => 
-      req.timestamp < consentTimestamp && 
-      req.type === 'pixel' && 
-      req.status === 'violation'
-    );
+  // Categorize requests by compliance status
+  const categorizedRequests = useMemo(() => {
+    return sortedRequests.map(req => {
+      const isPreConsent = req.timestamp < consentTimestamp;
+      const isViolation = req.status === 'violation';
+      
+      // Red (Critical): Marketing/Tracking pixel fired before Consent Gate
+      if (isPreConsent && isViolation && req.type === 'pixel') {
+        return { ...req, category: 'critical' as const };
+      }
+      
+      // Yellow (Warning): Potential fingerprinting or unclassified third-party
+      if (isPreConsent && (isViolation || req.dataTypes.length > 0)) {
+        return { ...req, category: 'warning' as const };
+      }
+      
+      // Green (Safe): Strictly necessary (CMP, Hosting, CSS) or post-consent
+      return { ...req, category: 'safe' as const };
+    });
   }, [sortedRequests, consentTimestamp]);
+
+  // Apply filter
+  const filteredRequests = useMemo(() => {
+    if (filter === 'violations') {
+      return categorizedRequests.filter(r => r.status === 'violation');
+    }
+    if (filter === 'pre-consent') {
+      return categorizedRequests.filter(r => r.timestamp < consentTimestamp);
+    }
+    return categorizedRequests;
+  }, [categorizedRequests, filter, consentTimestamp]);
 
   // Add custom scrollbar styles
   useEffect(() => {
@@ -268,31 +350,78 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Mobile: Scrollable Request Feed
   if (isMobile) {
     return (
       <div className="mb-12 bg-white/80 backdrop-blur-md border border-slate-200/15 rounded-lg p-6 shadow-lg">
-        <h3 className="text-xl font-black text-slate-900 mb-6">Request Lifecycle</h3>
-        <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar">
-          {sortedRequests.map((req, idx) => {
-            const isPreConsent = req.timestamp < consentTimestamp;
-            const isHighRisk = highRiskRequests.includes(req);
-            const position = ((req.timestamp - minTime) / duration) * 100;
+        <h3 className="text-xl font-black text-slate-900 mb-4">Request Lifecycle</h3>
+        
+        {/* Filter Toggle Bar - Mobile */}
+        <div className="flex items-center gap-2 bg-slate-100/50 rounded-lg p-1 mb-4 overflow-x-auto">
+          <button
+            onClick={() => setFilter('all')}
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all min-h-[44px] whitespace-nowrap ${
+              filter === 'all' 
+                ? 'bg-white text-slate-900 shadow-sm' 
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setFilter('violations')}
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all min-h-[44px] whitespace-nowrap ${
+              filter === 'violations' 
+                ? 'bg-white text-slate-900 shadow-sm' 
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Violations
+          </button>
+          <button
+            onClick={() => setFilter('pre-consent')}
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all min-h-[44px] whitespace-nowrap ${
+              filter === 'pre-consent' 
+                ? 'bg-white text-slate-900 shadow-sm' 
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Pre-Consent
+          </button>
+        </div>
+
+        {/* Fixed Height Scroll Container */}
+        <div className="max-h-[500px] overflow-y-auto custom-scrollbar space-y-3">
+          {filteredRequests.map((req) => {
+            const categoryColors = {
+              critical: {
+                bg: 'bg-red-50/50',
+                border: 'border-red-200/50',
+                shadow: 'shadow-lg shadow-red-500/20'
+              },
+              warning: {
+                bg: 'bg-amber-50/50',
+                border: 'border-amber-200/50',
+                shadow: ''
+              },
+              safe: {
+                bg: 'bg-emerald-50/50',
+                border: 'border-emerald-200/50',
+                shadow: ''
+              }
+            };
+            
+            const colors = categoryColors[req.category];
             
             return (
               <div
                 key={req.id}
-                className={`min-h-[44px] p-4 rounded-lg border transition-all ${
-                  isHighRisk 
-                    ? 'bg-red-50/50 border-red-200/50 shadow-lg shadow-red-500/20' 
-                    : isPreConsent
-                    ? 'bg-amber-50/50 border-amber-200/50'
-                    : 'bg-emerald-50/50 border-emerald-200/50'
-                }`}
+                className={`min-h-[44px] p-4 rounded-lg border transition-all ${colors.bg} ${colors.border} ${colors.shadow}`}
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-bold text-sm text-slate-900">{req.domain}</span>
-                  {isHighRisk && (
-                    <span className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded">HIGH RISK</span>
+                  {req.category === 'critical' && (
+                    <span className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded">CRITICAL</span>
                   )}
                 </div>
                 <div className="text-xs text-slate-600 font-mono truncate">{req.url}</div>
@@ -305,21 +434,20 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
                     {req.type}
                   </span>
                   <span className="text-xs text-slate-500">
-                    {((req.timestamp - minTime) / 1000).toFixed(2)}s
+                    +{((req.timestamp - minTime) / 1000).toFixed(2)}s
                   </span>
                 </div>
               </div>
             );
           })}
-          {/* Consent Event Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t-2 border-dashed border-blue-500"></div>
+          
+          {/* CONSENT GATE Divider - Mobile */}
+          <div className="relative my-6 bg-blue-600 text-white px-4 py-3 rounded-lg border-2 border-blue-700">
+            <div className="text-center font-black text-sm uppercase tracking-wider mb-1">
+              CONSENT GATE
             </div>
-            <div className="relative flex justify-center">
-              <span className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold">
-                Consent Event
-              </span>
+            <div className="text-xs text-center text-blue-100 font-medium">
+              Pre-Consent above • Post-Consent below
             </div>
           </div>
         </div>
@@ -330,73 +458,156 @@ const LifecycleWaterfall: React.FC<LifecycleWaterfallProps> = ({ requests, conse
   // Desktop: Vertical Timeline Waterfall
   return (
     <div className="mb-12 bg-white/80 backdrop-blur-md border border-slate-200/15 rounded-lg p-8 shadow-lg">
-      <h3 className="text-xl font-black text-slate-900 mb-8">Request Lifecycle</h3>
-      <div className="relative min-h-[400px]">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xl font-black text-slate-900">Request Lifecycle</h3>
+        
+        {/* Filter Toggle Bar */}
+        <div className="flex items-center gap-2 bg-slate-100/50 rounded-lg p-1">
+          <button
+            onClick={() => setFilter('all')}
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all min-h-[44px] ${
+              filter === 'all' 
+                ? 'bg-white text-slate-900 shadow-sm' 
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setFilter('violations')}
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all min-h-[44px] ${
+              filter === 'violations' 
+                ? 'bg-white text-slate-900 shadow-sm' 
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Violations Only
+          </button>
+          <button
+            onClick={() => setFilter('pre-consent')}
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all min-h-[44px] ${
+              filter === 'pre-consent' 
+                ? 'bg-white text-slate-900 shadow-sm' 
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Pre-Consent Only
+          </button>
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center gap-4 mb-6 text-xs font-medium text-slate-600">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-red-500"></div>
+          <span>Critical (Marketing/Tracking pre-consent)</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+          <span>Warning (Potential fingerprinting)</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+          <span>Safe (Strictly necessary)</span>
+        </div>
+      </div>
+
+      {/* Fixed Height Scroll Container */}
+      <div className="relative max-h-[500px] overflow-y-auto custom-scrollbar border border-slate-200/15 rounded-lg p-4">
+        <div className="relative min-h-[400px]">
         {/* Timeline */}
         <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-slate-200"></div>
         
-        {/* Requests */}
-        <div className="relative space-y-2">
-          {sortedRequests.map((req) => {
-            const isPreConsent = req.timestamp < consentTimestamp;
-            const isHighRisk = highRiskRequests.includes(req);
-            const position = ((req.timestamp - minTime) / duration) * 100;
-            
-            return (
-              <div
-                key={req.id}
-                className="relative pl-16 py-2"
-                style={{ marginTop: `${position * 0.1}px` }}
-              >
-                <div className={`absolute left-6 w-4 h-4 rounded-full border-2 border-white ${
-                  isHighRisk ? 'bg-red-500 ring-4 ring-red-500/30' :
-                  isPreConsent ? 'bg-amber-500' : 'bg-emerald-500'
-                }`}></div>
-                <div className={`p-4 rounded-lg border min-h-[44px] ${
-                  isHighRisk 
-                    ? 'bg-red-50/50 border-red-200/50 shadow-lg shadow-red-500/20' 
-                    : isPreConsent
-                    ? 'bg-amber-50/50 border-amber-200/50'
-                    : 'bg-emerald-50/50 border-emerald-200/50'
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-bold text-sm text-slate-900 truncate">{req.domain}</span>
-                        {isHighRisk && (
-                          <span className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded">HIGH RISK</span>
-                        )}
+          {/* Timeline */}
+          <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-slate-200"></div>
+          
+          {/* Requests */}
+          <div className="relative space-y-2">
+            {filteredRequests.map((req) => {
+              const isPreConsent = req.timestamp < consentTimestamp;
+              const position = ((req.timestamp - minTime) / duration) * 100;
+              
+              // Get category colors
+              const categoryColors = {
+                critical: {
+                  bg: 'bg-red-50/50',
+                  border: 'border-red-200/50',
+                  dot: 'bg-red-500',
+                  ring: 'ring-4 ring-red-500/30',
+                  shadow: 'shadow-lg shadow-red-500/20'
+                },
+                warning: {
+                  bg: 'bg-amber-50/50',
+                  border: 'border-amber-200/50',
+                  dot: 'bg-amber-500',
+                  ring: '',
+                  shadow: ''
+                },
+                safe: {
+                  bg: 'bg-emerald-50/50',
+                  border: 'border-emerald-200/50',
+                  dot: 'bg-emerald-500',
+                  ring: '',
+                  shadow: ''
+                }
+              };
+              
+              const colors = categoryColors[req.category];
+              
+              return (
+                <div
+                  key={req.id}
+                  className="relative pl-16 py-2"
+                  style={{ marginTop: `${position * 0.1}px` }}
+                >
+                  <div className={`absolute left-6 w-4 h-4 rounded-full border-2 border-white ${colors.dot} ${colors.ring}`}></div>
+                  <div className={`p-4 rounded-lg border min-h-[44px] ${colors.bg} ${colors.border} ${colors.shadow}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-sm text-slate-900 truncate">{req.domain}</span>
+                          {req.category === 'critical' && (
+                            <span className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded">CRITICAL</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-600 font-mono truncate">{req.url}</div>
                       </div>
-                      <div className="text-xs text-slate-600 font-mono truncate">{req.url}</div>
-                    </div>
-                    <div className="flex items-center gap-2 ml-4">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        req.type === 'pixel' ? 'bg-blue-100 text-blue-700' :
-                        req.type === 'script' ? 'bg-purple-100 text-purple-700' :
-                        'bg-slate-100 text-slate-700'
-                      }`}>
-                        {req.type}
-                      </span>
-                      <span className="text-xs text-slate-500 whitespace-nowrap">
-                        +{((req.timestamp - minTime) / 1000).toFixed(2)}s
-                      </span>
+                      <div className="flex items-center gap-2 ml-4">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          req.type === 'pixel' ? 'bg-blue-100 text-blue-700' :
+                          req.type === 'script' ? 'bg-purple-100 text-purple-700' :
+                          'bg-slate-100 text-slate-700'
+                        }`}>
+                          {req.type}
+                        </span>
+                        <span className="text-xs text-slate-500 whitespace-nowrap">
+                          +{((req.timestamp - minTime) / 1000).toFixed(2)}s
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
 
-        {/* Consent Event Divider */}
-        <div 
-          className="absolute left-0 right-0 flex items-center"
-          style={{ top: `${((consentTimestamp - minTime) / duration) * 100}%` }}
-        >
-          <div className="absolute left-6 w-4 h-4 rounded-full bg-blue-600 border-2 border-white ring-4 ring-blue-500/30"></div>
-          <div className="ml-16 flex-1 border-t-2 border-dashed border-blue-500"></div>
-          <div className="ml-4 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap">
-            Consent Event
+          {/* CONSENT GATE Divider - Bold Horizontal */}
+          <div 
+            className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-y-2 border-blue-600 my-4 py-3"
+            style={{ 
+              marginTop: `${((consentTimestamp - minTime) / duration) * 100}%`,
+              marginBottom: '1rem'
+            }}
+          >
+            <div className="flex items-center justify-center">
+              <div className="absolute left-6 w-4 h-4 rounded-full bg-blue-600 border-2 border-white ring-4 ring-blue-500/30"></div>
+              <div className="bg-blue-600 text-white px-6 py-2 rounded-lg text-base font-black uppercase tracking-wider">
+                CONSENT GATE
+              </div>
+            </div>
+            <div className="text-xs text-center text-slate-500 mt-2 font-medium">
+              Everything above is Pre-Consent • Everything below is Post-Consent Simulation
+            </div>
           </div>
         </div>
       </div>
