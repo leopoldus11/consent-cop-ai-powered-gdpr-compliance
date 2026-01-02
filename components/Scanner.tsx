@@ -69,16 +69,16 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
   return (
     <div className="max-w-5xl mx-auto h-full flex flex-col justify-center pt-4 sm:pt-8 lg:pt-16 pb-4 sm:pb-12 lg:pb-16 px-4 sm:px-6 lg:px-4">
       {/* Hero Section - Clean & Spacious */}
-      <div className="text-center mb-8 sm:mb-10 lg:mb-16">
-        <h1 className="text-2xl sm:text-3xl lg:text-5xl xl:text-6xl font-black text-slate-900 tracking-tight mb-3 sm:mb-4 lg:mb-6 leading-tight">
+      <div className="text-center mb-4 sm:mb-10 lg:mb-16 flex-shrink-0">
+        <h1 className="text-2xl sm:text-3xl lg:text-5xl xl:text-6xl font-black text-slate-900 tracking-tight mb-2 sm:mb-4 lg:mb-6 leading-tight">
           GDPR Compliance Testing
-          <span className="block text-blue-600 mt-2 sm:mt-3 lg:mt-4">for Privacy Professionals</span>
+          <span className="block text-blue-600 mt-1 sm:mt-3 lg:mt-4">for Privacy Professionals</span>
         </h1>
         {/* Mobile: Shorter, punchier copy */}
         <p className="hidden sm:block text-sm lg:text-lg xl:text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed mb-6 lg:mb-8">
           Automatically detect consent violations, track pre-consent pixel firing, and get AI-powered remediation advice. Built for DPOs, developers, and compliance teams.
         </p>
-        <p className="sm:hidden text-sm text-slate-600 max-w-md mx-auto leading-relaxed mb-4">
+        <p className="sm:hidden text-xs text-slate-600 max-w-md mx-auto leading-relaxed mb-3">
           Detect consent violations and get AI-powered remediation advice.
         </p>
         
