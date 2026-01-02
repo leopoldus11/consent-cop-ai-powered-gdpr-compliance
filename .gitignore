@@ -25,3 +25,5 @@ dist-ssr
 
 # Documentation files
 *.md
+.vercel
+.env*.local
