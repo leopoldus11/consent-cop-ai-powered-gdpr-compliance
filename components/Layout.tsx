@@ -328,6 +328,81 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
       <main className={`${currentPage === 'home' ? 'flex-1 flex flex-col min-h-0 overflow-y-auto' : 'flex-grow'}`}>
         <div className={currentPage === 'home' ? 'flex-1 flex flex-col min-h-full' : ''}>
           {children}
+          {currentPage === 'home' && (
+            <footer className="bg-white border-t border-slate-200 py-8 sm:py-12 lg:py-16 mt-auto">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                {/* Mobile: Compact layout with logo and 2-column grid */}
+                <div className="lg:hidden space-y-6">
+                  {/* Logo - Mobile only */}
+                  <div className="flex items-center space-x-2">
+                    <div className="bg-blue-600 p-1.5 rounded-lg shadow-sm">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                    </div>
+                    <span className="font-black text-slate-900 tracking-tight text-lg">CONSENT COP</span>
+                  </div>
+                  
+                  {/* 2-column grid for Product and Legal */}
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest mb-4">Product</h3>
+                      <ul className="space-y-2.5 text-sm text-slate-500 font-medium">
+                        <li><button onClick={() => onPageChange('enterprise')} className="hover:text-blue-600 transition-colors text-left">Enterprise</button></li>
+                        <li><button onClick={() => onPageChange('docs')} className="hover:text-blue-600 transition-colors text-left">Docs</button></li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest mb-4">Legal</h3>
+                      <ul className="space-y-2.5 text-sm text-slate-500 font-medium">
+                        <li><button onClick={() => onPageChange('impressum')} className="hover:text-blue-600 transition-colors text-left">Imprint</button></li>
+                        <li><button onClick={() => onPageChange('privacy')} className="hover:text-blue-600 transition-colors text-left">Privacy Policy</button></li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Desktop: Full layout with description */}
+                <div className="hidden lg:grid grid-cols-4 gap-12">
+                  <div className="col-span-2">
+                    <div className="flex items-center space-x-2 mb-6">
+                      <div className="bg-blue-600 p-1.5 rounded-lg shadow-sm">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                      </div>
+                      <span className="font-black text-slate-900 tracking-tight text-lg">CONSENT COP</span>
+                    </div>
+                    <p className="text-slate-500 text-sm max-w-sm leading-relaxed">
+                      The automated DPO assistant for high-growth tech teams. Built in Berlin for the global privacy standard.
+                    </p>
+                  </div>
+                  <div>
+                    <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest mb-6">Product</h3>
+                    <ul className="space-y-3 text-sm text-slate-500 font-medium">
+                      <li><button onClick={() => onPageChange('enterprise')} className="hover:text-blue-600 transition-colors">Enterprise</button></li>
+                      <li><button onClick={() => onPageChange('docs')} className="hover:text-blue-600 transition-colors">Docs</button></li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest mb-6">Legal</h3>
+                    <ul className="space-y-3 text-sm text-slate-500 font-medium">
+                      <li><button onClick={() => onPageChange('impressum')} className="hover:text-blue-600 transition-colors">Imprint</button></li>
+                      <li><button onClick={() => onPageChange('privacy')} className="hover:text-blue-600 transition-colors">Privacy Policy</button></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Copyright - Mobile optimized */}
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 lg:pt-12 mt-6 sm:mt-8 lg:mt-12 border-t border-slate-100">
+                <div className="flex items-center justify-center sm:justify-start space-x-2 text-slate-400 text-xs sm:text-[10px] font-medium">
+                  <span>© {new Date().getFullYear()} Consent Cop</span>
+                  <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[9px] font-bold">BETA</span>
+                </div>
+              </div>
+            </footer>
+          )}
         </div>
       </main>
 
@@ -485,43 +560,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
         </div>
       )}
 
-      <footer className="bg-white border-t border-slate-200 py-8 sm:py-12 lg:py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Mobile: Compact layout with logo and 2-column grid */}
-          <div className="lg:hidden space-y-6">
-            {/* Logo - Mobile only */}
-            <div className="flex items-center space-x-2">
-              <div className="bg-blue-600 p-1.5 rounded-lg shadow-sm">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-              </div>
-              <span className="font-black text-slate-900 tracking-tight text-lg">CONSENT COP</span>
-            </div>
-            
-            {/* 2-column grid for Product and Legal */}
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest mb-4">Product</h3>
-                <ul className="space-y-2.5 text-sm text-slate-500 font-medium">
-                  <li><button onClick={() => onPageChange('enterprise')} className="hover:text-blue-600 transition-colors text-left">Enterprise</button></li>
-                  <li><button onClick={() => onPageChange('docs')} className="hover:text-blue-600 transition-colors text-left">Docs</button></li>
-                </ul>
-              </div>
-              <div>
-                <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest mb-4">Legal</h3>
-                <ul className="space-y-2.5 text-sm text-slate-500 font-medium">
-                  <li><button onClick={() => onPageChange('impressum')} className="hover:text-blue-600 transition-colors text-left">Imprint</button></li>
-                  <li><button onClick={() => onPageChange('privacy')} className="hover:text-blue-600 transition-colors text-left">Privacy Policy</button></li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          {/* Desktop: Full layout with description */}
-          <div className="hidden lg:grid grid-cols-4 gap-12">
-            <div className="col-span-2">
-              <div className="flex items-center space-x-2 mb-6">
+      {currentPage !== 'home' && (
+        <footer className="bg-white border-t border-slate-200 py-8 sm:py-12 lg:py-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            {/* Mobile: Compact layout with logo and 2-column grid */}
+            <div className="lg:hidden space-y-6">
+              {/* Logo - Mobile only */}
+              <div className="flex items-center space-x-2">
                 <div className="bg-blue-600 p-1.5 rounded-lg shadow-sm">
                   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -529,35 +574,67 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                 </div>
                 <span className="font-black text-slate-900 tracking-tight text-lg">CONSENT COP</span>
               </div>
-              <p className="text-slate-500 text-sm max-w-sm leading-relaxed">
-                The automated DPO assistant for high-growth tech teams. Built in Berlin for the global privacy standard.
-              </p>
+              
+              {/* 2-column grid for Product and Legal */}
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest mb-4">Product</h3>
+                  <ul className="space-y-2.5 text-sm text-slate-500 font-medium">
+                    <li><button onClick={() => onPageChange('enterprise')} className="hover:text-blue-600 transition-colors text-left">Enterprise</button></li>
+                    <li><button onClick={() => onPageChange('docs')} className="hover:text-blue-600 transition-colors text-left">Docs</button></li>
+                  </ul>
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest mb-4">Legal</h3>
+                  <ul className="space-y-2.5 text-sm text-slate-500 font-medium">
+                    <li><button onClick={() => onPageChange('impressum')} className="hover:text-blue-600 transition-colors text-left">Imprint</button></li>
+                    <li><button onClick={() => onPageChange('privacy')} className="hover:text-blue-600 transition-colors text-left">Privacy Policy</button></li>
+                  </ul>
+                </div>
+              </div>
             </div>
-            <div>
-              <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest mb-6">Product</h3>
-              <ul className="space-y-3 text-sm text-slate-500 font-medium">
-                <li><button onClick={() => onPageChange('enterprise')} className="hover:text-blue-600 transition-colors">Enterprise</button></li>
-                <li><button onClick={() => onPageChange('docs')} className="hover:text-blue-600 transition-colors">Docs</button></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest mb-6">Legal</h3>
-              <ul className="space-y-3 text-sm text-slate-500 font-medium">
-                <li><button onClick={() => onPageChange('impressum')} className="hover:text-blue-600 transition-colors">Imprint</button></li>
-                <li><button onClick={() => onPageChange('privacy')} className="hover:text-blue-600 transition-colors">Privacy Policy</button></li>
-              </ul>
+
+            {/* Desktop: Full layout with description */}
+            <div className="hidden lg:grid grid-cols-4 gap-12">
+              <div className="col-span-2">
+                <div className="flex items-center space-x-2 mb-6">
+                  <div className="bg-blue-600 p-1.5 rounded-lg shadow-sm">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                  </div>
+                  <span className="font-black text-slate-900 tracking-tight text-lg">CONSENT COP</span>
+                </div>
+                <p className="text-slate-500 text-sm max-w-sm leading-relaxed">
+                  The automated DPO assistant for high-growth tech teams. Built in Berlin for the global privacy standard.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest mb-6">Product</h3>
+                <ul className="space-y-3 text-sm text-slate-500 font-medium">
+                  <li><button onClick={() => onPageChange('enterprise')} className="hover:text-blue-600 transition-colors">Enterprise</button></li>
+                  <li><button onClick={() => onPageChange('docs')} className="hover:text-blue-600 transition-colors">Docs</button></li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest mb-6">Legal</h3>
+                <ul className="space-y-3 text-sm text-slate-500 font-medium">
+                  <li><button onClick={() => onPageChange('impressum')} className="hover:text-blue-600 transition-colors">Imprint</button></li>
+                  <li><button onClick={() => onPageChange('privacy')} className="hover:text-blue-600 transition-colors">Privacy Policy</button></li>
+                </ul>
+              </div>
             </div>
           </div>
-        </div>
-        
-        {/* Copyright - Mobile optimized */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 lg:pt-12 mt-6 sm:mt-8 lg:mt-12 border-t border-slate-100">
-          <div className="flex items-center justify-center sm:justify-start space-x-2 text-slate-400 text-xs sm:text-[10px] font-medium">
-            <span>© {new Date().getFullYear()} Consent Cop</span>
-            <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[9px] font-bold">BETA</span>
+          
+          {/* Copyright - Mobile optimized */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 lg:pt-12 mt-6 sm:mt-8 lg:mt-12 border-t border-slate-100">
+            <div className="flex items-center justify-center sm:justify-start space-x-2 text-slate-400 text-xs sm:text-[10px] font-medium">
+              <span>© {new Date().getFullYear()} Consent Cop</span>
+              <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[9px] font-bold">BETA</span>
+            </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      )}
       </div>
     </AuthProvider>
   );
