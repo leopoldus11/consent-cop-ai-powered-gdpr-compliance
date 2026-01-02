@@ -68,14 +68,23 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto h-full px-4 sm:px-6 lg:px-4 flex flex-col flex-1">
-      {/* Mobile: CSS Grid layout for perfect viewport distribution with equal spacing */}
-      {/* Grid height = 100dvh - header(4rem) - top padding - bottom padding */}
-      <div className="h-full grid grid-rows-[auto_auto_auto_1fr] sm:grid-rows-[auto_auto_auto_auto] gap-4 sm:gap-6 lg:gap-8" style={{
-        paddingTop: 'clamp(1rem, env(safe-area-inset-top, 1rem), 2rem)',
-        paddingBottom: 'clamp(1rem, calc(env(safe-area-inset-bottom, 1rem) + 1rem), 2rem)'
-      }}>
-        {/* Row 1: Hero Section */}
+    <div className="max-w-5xl mx-auto h-full px-4 sm:px-6 lg:px-4">
+      {/* Mobile: CSS Grid layout with header spacer row for perfect viewport distribution */}
+      {/* Grid: h-[100dvh], Row 1 = header height (4rem), equal gaps throughout */}
+      <div 
+        className={`h-[100dvh] grid gap-4 sm:gap-6 lg:gap-8 px-0 sm:px-0 lg:px-0`}
+        style={{
+          gridTemplateRows: isLoggedOut 
+            ? '4rem auto auto 1fr'  // Logged out: spacer, hero, message, scan card
+            : '4rem auto 1fr',       // Logged in: spacer, hero, scan card
+          paddingBottom: '1rem',     // Equal to gap (1rem = gap-4)
+          paddingTop: '0',           // No top padding, gap handles spacing
+        }}
+      >
+        {/* Row 1: Empty spacer for header height (4rem) */}
+        <div className="hidden sm:block"></div>
+        
+        {/* Row 2: Hero Section */}
         <div className="text-center flex-shrink-0">
           <h1 className="text-2xl sm:text-3xl lg:text-5xl xl:text-6xl font-black text-slate-900 tracking-tight mb-2 sm:mb-4 lg:mb-6 leading-tight">
             GDPR Compliance Testing
@@ -112,7 +121,7 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
           </div>
         </div>
 
-        {/* Row 2: Login Message (only when logged out) */}
+        {/* Row 3: Login Message (only when logged out) */}
         {isLoggedOut && (
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 sm:p-5 flex-shrink-0">
             <p className="text-sm sm:text-base text-blue-800 flex items-start sm:items-center">
@@ -125,19 +134,7 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
           </div>
         )}
 
-        {/* Row 3: Warning (only when logged in but can't scan) */}
-        {user && !scanCheck.allowed && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 sm:p-5 flex-shrink-0">
-            <p className="text-sm sm:text-base text-amber-800 flex items-start sm:items-center">
-              <svg className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5 sm:mt-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              <span>{scanCheck.reason || 'Weekly scan limit reached'}</span>
-            </p>
-          </div>
-        )}
-
-        {/* Row 4: Scanner Card - Takes remaining space on mobile, auto on desktop */}
+        {/* Row 4 (logged out) or Row 3 (logged in): Scanner Card - Takes remaining space (1fr) */}
         <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-xl p-4 sm:p-8 lg:p-12 flex-shrink-0 sm:flex-shrink-0 self-center w-full">
         <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4 sm:gap-4">
         <div className="relative flex-grow">
