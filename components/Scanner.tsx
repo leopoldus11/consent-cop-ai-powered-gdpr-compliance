@@ -28,91 +28,96 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
     setScanCheck(canUserScan());
   };
 
-  // Calculate perfect equal spacing using CSS Custom Properties
-  // This approach: Calculate spacing once, set CSS variables, CSS handles layout
+  // SIMPLE SOLUTION: Calculate ONE equal spacing value and use it everywhere
+  // Formula: (available space - all content) / number of gaps = equal spacing
   useLayoutEffect(() => {
     if (!containerRef.current || !heroRef.current) return;
 
     const calculateEqualSpacing = () => {
-      // Get actual container height (100dvh - accounts for browser chrome)
-      const containerHeight = containerRef.current!.offsetHeight;
-      
-      // Constants
+      const container = containerRef.current!;
+      const containerHeight = container.offsetHeight;
       const headerHeight = 64; // 4rem
       
-      // Get safe area insets
+      // Get safe area bottom
       const safeAreaBottom = parseInt(
         getComputedStyle(document.documentElement)
           .getPropertyValue('env(safe-area-inset-bottom)')
           .replace('px', '') || '0'
       ) || 0;
       
-      // Measure content heights
-      const heroHeight = heroRef.current!.offsetHeight;
-      const messageHeight = isLoggedOut && messageRef.current 
+      // Measure content
+      const heroHeight = heroRef.current!.offsetHeight || 0;
+      const messageHeight = (isLoggedOut && messageRef.current) 
         ? messageRef.current.offsetHeight 
         : 0;
       
-      // Available space = container - header - safe area bottom
+      // Calculate: available = container - header - safe area
       const availableHeight = containerHeight - headerHeight - safeAreaBottom;
       
       // Calculate equal spacing
-      // We need: gap1 (after header), gap2 (after hero), gap3 (after message if logged out), padding-bottom
-      // All gaps should be equal
       if (isLoggedOut) {
-        // Logged out: header + gap1 + hero + gap2 + message + gap3 + scan + padding-bottom
-        // Total content: hero + message
-        // Number of gaps: 3 (gap1, gap2, gap3) + 1 (padding-bottom) = 4 equal spaces
-        const totalContentHeight = heroHeight + messageHeight;
-        const totalSpacing = availableHeight - totalContentHeight;
-        const equalSpacing = totalSpacing / 4; // 4 equal spaces
+        // 4 gaps needed: after header, after hero, after message, padding-bottom
+        const totalContent = heroHeight + messageHeight;
+        const totalGapSpace = availableHeight - totalContent;
+        const equalSpacing = totalGapSpace / 4;
         
-        // Set CSS custom properties
-        containerRef.current!.style.setProperty('--spacing-top', `${equalSpacing}px`);
-        containerRef.current!.style.setProperty('--spacing-middle', `${equalSpacing}px`);
-        containerRef.current!.style.setProperty('--spacing-bottom', `${equalSpacing}px`);
-        containerRef.current!.style.setProperty('--spacing-padding', `${equalSpacing + safeAreaBottom}px`);
+        // Set ONE spacing value used everywhere
+        container.style.setProperty('--equal-spacing', `${equalSpacing}px`);
+        container.style.setProperty('--padding-bottom', `${equalSpacing + safeAreaBottom}px`);
+        
+        console.log('[Spacing] Logged out:', {
+          containerHeight,
+          availableHeight,
+          heroHeight,
+          messageHeight,
+          totalContent,
+          totalGapSpace,
+          equalSpacing,
+          safeAreaBottom
+        });
       } else {
-        // Logged in: header + gap1 + hero + gap2 + scan + padding-bottom
-        // Total content: hero
-        // Number of gaps: 2 (gap1, gap2) + 1 (padding-bottom) = 3 equal spaces
-        const totalContentHeight = heroHeight;
-        const totalSpacing = availableHeight - totalContentHeight;
-        const equalSpacing = totalSpacing / 3; // 3 equal spaces
+        // 3 gaps needed: after header, after hero, padding-bottom
+        const totalContent = heroHeight;
+        const totalGapSpace = availableHeight - totalContent;
+        const equalSpacing = totalGapSpace / 3;
         
-        // Set CSS custom properties
-        containerRef.current!.style.setProperty('--spacing-top', `${equalSpacing}px`);
-        containerRef.current!.style.setProperty('--spacing-middle', `${equalSpacing}px`);
-        containerRef.current!.style.setProperty('--spacing-bottom', `${equalSpacing}px`);
-        containerRef.current!.style.setProperty('--spacing-padding', `${equalSpacing + safeAreaBottom}px`);
+        // Set ONE spacing value used everywhere
+        container.style.setProperty('--equal-spacing', `${equalSpacing}px`);
+        container.style.setProperty('--padding-bottom', `${equalSpacing + safeAreaBottom}px`);
+        
+        console.log('[Spacing] Logged in:', {
+          containerHeight,
+          availableHeight,
+          heroHeight,
+          totalContent,
+          totalGapSpace,
+          equalSpacing,
+          safeAreaBottom
+        });
       }
     };
 
-    // Initial calculation with delays to ensure content is rendered
-    const timeout1 = setTimeout(calculateEqualSpacing, 50);
-    const timeout2 = setTimeout(calculateEqualSpacing, 150);
-    const timeout3 = setTimeout(calculateEqualSpacing, 300);
+    // Calculate with multiple attempts
+    const timeouts = [
+      setTimeout(calculateEqualSpacing, 100),
+      setTimeout(calculateEqualSpacing, 300),
+      setTimeout(calculateEqualSpacing, 500),
+    ];
 
-    // Use ResizeObserver to recalculate when content changes
-    const resizeObserver = new ResizeObserver(() => {
-      calculateEqualSpacing();
-    });
-
+    // ResizeObserver for content changes
+    const resizeObserver = new ResizeObserver(calculateEqualSpacing);
     if (containerRef.current) resizeObserver.observe(containerRef.current);
     if (heroRef.current) resizeObserver.observe(heroRef.current);
     if (messageRef.current) resizeObserver.observe(messageRef.current);
 
-    // Also recalculate on window resize and orientation change
-    const handleResize = () => setTimeout(calculateEqualSpacing, 150);
-    const handleOrientationChange = () => setTimeout(calculateEqualSpacing, 300);
-
+    // Window events
+    const handleResize = () => setTimeout(calculateEqualSpacing, 200);
+    const handleOrientationChange = () => setTimeout(calculateEqualSpacing, 400);
     window.addEventListener('resize', handleResize);
     window.addEventListener('orientationchange', handleOrientationChange);
 
     return () => {
-      clearTimeout(timeout1);
-      clearTimeout(timeout2);
-      clearTimeout(timeout3);
+      timeouts.forEach(clearTimeout);
       resizeObserver.disconnect();
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('orientationchange', handleOrientationChange);
@@ -170,7 +175,7 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
         ref={containerRef}
         className="h-[100dvh] flex flex-col max-w-5xl mx-auto px-4 sm:px-6 lg:px-4"
         style={{
-          paddingBottom: 'var(--spacing-padding, 1rem)',
+          paddingBottom: 'var(--padding-bottom, 1rem)',
         }}
       >
         {/* Header spacer (4rem) */}
@@ -181,7 +186,7 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
           ref={heroRef} 
           className="text-center flex-shrink-0"
           style={{
-            marginTop: 'var(--spacing-top, 1rem)',
+            marginTop: 'var(--equal-spacing, 1rem)',
           }}
         >
           <h1 className="text-2xl sm:text-3xl lg:text-5xl xl:text-6xl font-black text-slate-900 tracking-tight mb-2 sm:mb-4 lg:mb-6 leading-tight">
@@ -225,7 +230,7 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
             ref={messageRef} 
             className="bg-blue-50 border border-blue-200 rounded-xl p-3 sm:p-5 flex-shrink-0"
             style={{
-              marginTop: 'var(--spacing-middle, 1rem)',
+              marginTop: 'var(--equal-spacing, 1rem)',
             }}
           >
             <p className="text-sm sm:text-base text-blue-800 flex items-start sm:items-center">
@@ -242,7 +247,7 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
         <div 
           className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-xl p-4 sm:p-8 lg:p-12 flex-1 w-full flex flex-col justify-center"
           style={{
-            marginTop: isLoggedOut ? 'var(--spacing-bottom, 1rem)' : 'var(--spacing-middle, 1rem)',
+            marginTop: 'var(--equal-spacing, 1rem)',
           }}
         >
         <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4 sm:gap-4">
