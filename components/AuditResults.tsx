@@ -64,10 +64,10 @@ export const AuditResults: React.FC<AuditResultsProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         {/* Hero Scorecard Section - Bento Layout */}
         <div className="mb-12">
-          {/* Bento Grid: 2x2 for score, 1x1 for metrics */}
+          {/* Bento Grid: 2x2 for score, 1x1 for metrics - Responsive collapse to single column on mobile */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Circular Compliance Score - 2x2 (spans 2 columns on desktop) */}
-            <div className="md:col-span-2 md:row-span-2">
+            {/* Circular Compliance Score - 2x2 (spans 2 columns on desktop, full width on mobile) */}
+            <div className="md:col-span-2 md:row-span-2 min-h-[300px] md:min-h-[400px]">
               <div className={`h-full bg-gradient-to-br ${
                 complianceScore >= 80 
                   ? 'from-emerald-50/80 to-green-50/80' 
