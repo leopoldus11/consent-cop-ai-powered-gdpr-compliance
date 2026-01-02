@@ -2,10 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { Scanner } from './components/Scanner';
-import { RiskAssessment } from './components/RiskAssessment';
-import { Timeline } from './components/Timeline';
-import { AiAdvisor } from './components/AiAdvisor';
-import { ViolationList } from './components/ViolationList';
+import { AuditResults } from './components/AuditResults';
 import { EnterprisePage, DocsPage, ImpressumPage, SecurityPage, PrivacyPage } from './components/InformationPages';
 import { ScanResult, AIAnalysis, Page } from './types';
 import { mockScan } from './services/mockScanner';
@@ -78,6 +75,21 @@ const App: React.FC = () => {
   };
 
   const renderHome = () => (
+    <div className={`${!result && !isScanning ? 'h-full w-full' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-full'}`}>
+      <Scanner onScanStart={startScan} isLoading={isScanning} />
+      
+      {result ? (
+        <AuditResults 
+          result={result}
+          aiAnalysis={aiAnalysis}
+          onExportPDF={handleExportPDF}
+          isExportingPDF={isExportingPDF}
+        />
+      ) : null}
+    </div>
+  );
+
+  const renderHomeOld = () => (
     <div className={`${!result && !isScanning ? 'h-full w-full' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-full'}`}>
       <Scanner onScanStart={startScan} isLoading={isScanning} />
       
