@@ -551,14 +551,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
         {/* Copyright - Mobile optimized */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 lg:pt-12 mt-6 sm:mt-8 lg:mt-12 border-t border-slate-100">
           <div className="flex items-center justify-center sm:justify-start space-x-2 text-slate-400 text-xs sm:text-[10px] font-medium">
-            <span>{new Date().getFullYear()}</span>
-            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.54-13H9.5c-.28 0-.5.22-.5.5v7c0 .28.22.5.5.5h2.04c.28 0 .5-.22.5-.5v-7c0-.28-.22-.5-.5-.5zm0 4H9.5v-3h2.04v3z"/>
-            </svg>
-            <span>Consent Cop</span>
-            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.54-13H9.5c-.28 0-.5.22-.5.5v7c0 .28.22.5.5.5h2.04c.28 0 .5-.22.5-.5v-7c0-.28-.22-.5-.5-.5zm0 4H9.5v-3h2.04v3z"/>
-            </svg>
+            <span>© {new Date().getFullYear()} Consent Cop</span>
             <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[9px] font-bold">BETA</span>
           </div>
         </div>
