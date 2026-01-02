@@ -238,8 +238,13 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
           </div>
         )}
 
-        {/* Row 4 (logged out) or Row 3 (logged in): Scanner Card - Takes remaining space (1fr) */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-xl p-4 sm:p-8 lg:p-12 flex-shrink-0 sm:flex-shrink-0 self-center w-full">
+        {/* Scanner Card - Takes remaining space with flex-1 */}
+        <div 
+          className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-xl p-4 sm:p-8 lg:p-12 flex-1 w-full flex flex-col justify-center"
+          style={{
+            marginTop: isLoggedOut ? 'var(--spacing-bottom, 1rem)' : 'var(--spacing-middle, 1rem)',
+          }}
+        >
         <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4 sm:gap-4">
         <div className="relative flex-grow">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
