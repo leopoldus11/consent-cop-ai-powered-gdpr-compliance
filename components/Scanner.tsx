@@ -68,21 +68,20 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto h-full px-4 sm:px-6 lg:px-4">
+    <div className="h-full w-full">
       {/* Mobile: CSS Grid layout with header spacer row for perfect viewport distribution */}
       {/* Grid: h-[100dvh], Row 1 = header height (4rem), equal gaps throughout */}
       <div 
-        className={`h-[100dvh] grid gap-4 sm:gap-6 lg:gap-8 px-0 sm:px-0 lg:px-0`}
+        className="h-[100dvh] grid gap-4 sm:gap-6 lg:gap-8 max-w-5xl mx-auto px-4 sm:px-6 lg:px-4"
         style={{
           gridTemplateRows: isLoggedOut 
             ? '4rem auto auto 1fr'  // Logged out: spacer, hero, message, scan card
             : '4rem auto 1fr',       // Logged in: spacer, hero, scan card
-          paddingBottom: '1rem',     // Equal to gap (1rem = gap-4)
-          paddingTop: '0',           // No top padding, gap handles spacing
+          paddingBottom: '1rem',     // Equal to gap (1rem = gap-4) for spacing to URL bar
         }}
       >
-        {/* Row 1: Empty spacer for header height (4rem) */}
-        <div className="hidden sm:block"></div>
+        {/* Row 1: Empty spacer for header height (4rem) - always visible */}
+        <div></div>
         
         {/* Row 2: Hero Section */}
         <div className="text-center flex-shrink-0">
