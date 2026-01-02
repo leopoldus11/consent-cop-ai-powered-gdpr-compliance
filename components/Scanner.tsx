@@ -68,9 +68,10 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto h-full px-4 sm:px-6 lg:px-4 flex flex-col">
+    <div className="max-w-5xl mx-auto h-full px-4 sm:px-6 lg:px-4 flex flex-col flex-1">
       {/* Mobile: CSS Grid layout for perfect viewport distribution with equal spacing */}
-      <div className="h-full grid grid-rows-[auto_auto_auto_1fr] sm:grid-rows-[auto_auto_auto_auto] gap-4 sm:gap-6 lg:gap-8 py-4 sm:py-8 lg:py-16" style={{
+      {/* Grid height = 100dvh - header(4rem) - top padding - bottom padding */}
+      <div className="h-full grid grid-rows-[auto_auto_auto_1fr] sm:grid-rows-[auto_auto_auto_auto] gap-4 sm:gap-6 lg:gap-8" style={{
         paddingTop: 'clamp(1rem, env(safe-area-inset-top, 1rem), 2rem)',
         paddingBottom: 'clamp(1rem, calc(env(safe-area-inset-bottom, 1rem) + 1rem), 2rem)'
       }}>
