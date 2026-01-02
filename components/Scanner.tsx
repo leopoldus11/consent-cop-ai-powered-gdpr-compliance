@@ -106,7 +106,7 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
       </div>
 
       {/* Alerts - More Spacious */}
-      {!user && (
+      {!user ? (
         <div className="mb-6 sm:mb-8 lg:mb-10 bg-blue-50 border border-blue-200 rounded-xl p-4 sm:p-5">
           <p className="text-sm sm:text-base text-blue-800 flex items-start sm:items-center">
             <svg className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5 sm:mt-0" fill="currentColor" viewBox="0 0 20 20">
@@ -116,9 +116,7 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
             <span className="sm:hidden">Sign in to start scanning. 5 free scans per week.</span>
           </p>
         </div>
-      )}
-      
-      {user && !scanCheck.allowed && (
+      ) : user && !scanCheck.allowed && (
         <div className="mb-6 sm:mb-8 lg:mb-10 bg-amber-50 border border-amber-200 rounded-xl p-4 sm:p-5">
           <p className="text-sm sm:text-base text-amber-800 flex items-start sm:items-center">
             <svg className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5 sm:mt-0" fill="currentColor" viewBox="0 0 20 20">
