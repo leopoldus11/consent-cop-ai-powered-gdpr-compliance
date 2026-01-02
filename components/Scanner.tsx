@@ -46,14 +46,16 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
           .replace('px', '') || '0'
       ) || 0;
       
-      // Measure content (including scan card minimum height)
+      // Measure content heights (natural heights)
       const heroHeight = heroRef.current!.offsetHeight || 0;
       const messageHeight = (isLoggedOut && messageRef.current) 
         ? messageRef.current.offsetHeight 
         : 0;
-      const scanCardMinHeight = scanCardRef.current 
-        ? scanCardRef.current.scrollHeight // Use scrollHeight to get actual content height
-        : 200; // Fallback minimum
+      
+      // Measure scan card's natural height (now that flex-1 is removed)
+      const scanCardHeight = scanCardRef.current 
+        ? scanCardRef.current.offsetHeight || scanCardRef.current.scrollHeight
+        : 200; // Fallback estimate
       
       // Calculate: available = container - header - safe area
       const availableHeight = containerHeight - headerHeight - safeAreaBottom;
@@ -61,8 +63,8 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
       // Calculate equal spacing
       if (isLoggedOut) {
         // 4 gaps needed: after header, after hero, after message, padding-bottom
-        // Content: hero + message + scan card (min height)
-        const totalContent = heroHeight + messageHeight + scanCardMinHeight;
+        // Content: hero + message + scan card (natural height)
+        const totalContent = heroHeight + messageHeight + scanCardHeight;
         const totalGapSpace = availableHeight - totalContent;
         const equalSpacing = Math.max(0, totalGapSpace / 4); // Prevent negative
         
@@ -75,7 +77,7 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
           availableHeight,
           heroHeight,
           messageHeight,
-          scanCardMinHeight,
+          scanCardHeight,
           totalContent,
           totalGapSpace,
           equalSpacing,
@@ -84,8 +86,8 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
         });
       } else {
         // 3 gaps needed: after header, after hero, padding-bottom
-        // Content: hero + scan card (min height)
-        const totalContent = heroHeight + scanCardMinHeight;
+        // Content: hero + scan card (natural height)
+        const totalContent = heroHeight + scanCardHeight;
         const totalGapSpace = availableHeight - totalContent;
         const equalSpacing = Math.max(0, totalGapSpace / 3); // Prevent negative
         
@@ -97,7 +99,7 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
           containerHeight,
           availableHeight,
           heroHeight,
-          scanCardMinHeight,
+          scanCardHeight,
           totalContent,
           totalGapSpace,
           equalSpacing,
@@ -254,10 +256,10 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
           </div>
         )}
 
-        {/* Scanner Card - Takes remaining space with flex-1 */}
+        {/* Scanner Card - Natural height, spacing calculated around it */}
         <div 
           ref={scanCardRef}
-          className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-xl p-4 sm:p-8 lg:p-12 flex-1 w-full flex flex-col justify-center min-h-0"
+          className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-xl p-4 sm:p-8 lg:p-12 w-full flex-shrink-0"
           style={{
             marginTop: 'var(--equal-spacing, 1rem)',
           }}
