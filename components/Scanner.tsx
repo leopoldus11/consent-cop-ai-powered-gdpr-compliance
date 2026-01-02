@@ -16,6 +16,7 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
   const messageRef = useRef<HTMLDivElement>(null);
+  const scanCardRef = useRef<HTMLDivElement>(null);
 
   // Function to update user state and scan check
   const updateAuthState = async () => {
@@ -45,11 +46,14 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
           .replace('px', '') || '0'
       ) || 0;
       
-      // Measure content
+      // Measure content (including scan card minimum height)
       const heroHeight = heroRef.current!.offsetHeight || 0;
       const messageHeight = (isLoggedOut && messageRef.current) 
         ? messageRef.current.offsetHeight 
         : 0;
+      const scanCardMinHeight = scanCardRef.current 
+        ? scanCardRef.current.scrollHeight // Use scrollHeight to get actual content height
+        : 200; // Fallback minimum
       
       // Calculate: available = container - header - safe area
       const availableHeight = containerHeight - headerHeight - safeAreaBottom;
@@ -57,9 +61,10 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
       // Calculate equal spacing
       if (isLoggedOut) {
         // 4 gaps needed: after header, after hero, after message, padding-bottom
-        const totalContent = heroHeight + messageHeight;
+        // Content: hero + message + scan card (min height)
+        const totalContent = heroHeight + messageHeight + scanCardMinHeight;
         const totalGapSpace = availableHeight - totalContent;
-        const equalSpacing = totalGapSpace / 4;
+        const equalSpacing = Math.max(0, totalGapSpace / 4); // Prevent negative
         
         // Set ONE spacing value used everywhere
         container.style.setProperty('--equal-spacing', `${equalSpacing}px`);
@@ -70,16 +75,19 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
           availableHeight,
           heroHeight,
           messageHeight,
+          scanCardMinHeight,
           totalContent,
           totalGapSpace,
           equalSpacing,
-          safeAreaBottom
+          safeAreaBottom,
+          computedSpacing: getComputedStyle(container).getPropertyValue('--equal-spacing')
         });
       } else {
         // 3 gaps needed: after header, after hero, padding-bottom
-        const totalContent = heroHeight;
+        // Content: hero + scan card (min height)
+        const totalContent = heroHeight + scanCardMinHeight;
         const totalGapSpace = availableHeight - totalContent;
-        const equalSpacing = totalGapSpace / 3;
+        const equalSpacing = Math.max(0, totalGapSpace / 3); // Prevent negative
         
         // Set ONE spacing value used everywhere
         container.style.setProperty('--equal-spacing', `${equalSpacing}px`);
@@ -89,10 +97,12 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
           containerHeight,
           availableHeight,
           heroHeight,
+          scanCardMinHeight,
           totalContent,
           totalGapSpace,
           equalSpacing,
-          safeAreaBottom
+          safeAreaBottom,
+          computedSpacing: getComputedStyle(container).getPropertyValue('--equal-spacing')
         });
       }
     };
@@ -109,6 +119,7 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
     if (containerRef.current) resizeObserver.observe(containerRef.current);
     if (heroRef.current) resizeObserver.observe(heroRef.current);
     if (messageRef.current) resizeObserver.observe(messageRef.current);
+    if (scanCardRef.current) resizeObserver.observe(scanCardRef.current);
 
     // Window events
     const handleResize = () => setTimeout(calculateEqualSpacing, 200);
@@ -245,7 +256,8 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
 
         {/* Scanner Card - Takes remaining space with flex-1 */}
         <div 
-          className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-xl p-4 sm:p-8 lg:p-12 flex-1 w-full flex flex-col justify-center"
+          ref={scanCardRef}
+          className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-xl p-4 sm:p-8 lg:p-12 flex-1 w-full flex flex-col justify-center min-h-0"
           style={{
             marginTop: 'var(--equal-spacing, 1rem)',
           }}
