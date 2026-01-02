@@ -325,7 +325,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
         </div>
       </header>
 
-      <main className={`flex-grow ${currentPage === 'home' ? 'overflow-hidden' : ''}`}>
+      <main className={`${currentPage === 'home' ? 'flex-1 flex flex-col min-h-0' : 'flex-grow'}`}>
         {children}
       </main>
 
@@ -483,7 +483,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
         </div>
       )}
 
-      <footer className={`bg-white border-t border-slate-200 py-8 sm:py-12 lg:py-16 ${currentPage === 'home' ? 'hidden lg:block' : ''}`}>
+      <footer className="bg-white border-t border-slate-200 py-8 sm:py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Mobile: Compact layout with logo and 2-column grid */}
           <div className="lg:hidden space-y-6">
