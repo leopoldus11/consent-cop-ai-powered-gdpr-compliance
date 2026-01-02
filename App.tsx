@@ -187,16 +187,6 @@ const App: React.FC = () => {
             <RiskAssessment result={result} />
           </div>
         </div>
-      ) : !isScanning ? (
-        <div className="hidden lg:flex mt-12 sm:mt-16 lg:mt-20 flex-col items-center justify-center text-center pb-12 sm:pb-16 lg:pb-20 px-4">
-           <div className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 bg-white rounded-2xl sm:rounded-[2rem] shadow-xl sm:shadow-2xl shadow-slate-100 flex items-center justify-center mb-4 sm:mb-6 transform rotate-6 hover:rotate-0 transition-transform duration-500 border border-slate-50">
-             <svg className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
-           </div>
-           <h2 className="text-lg sm:text-xl lg:text-2xl font-black text-slate-900 tracking-tight px-4 mb-2 sm:mb-3">Automated Compliance Drone</h2>
-           <p className="text-slate-500 mt-2 sm:mt-3 max-w-sm mx-auto leading-relaxed font-medium text-xs sm:text-sm lg:text-base px-4">
-             Real-time compliance monitoring that intercepts tracking pixels before they fire. Catch every violation, every time.
-           </p>
-        </div>
       ) : null}
     </div>
   );
