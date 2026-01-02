@@ -85,6 +85,102 @@ export const ImpressumPage = () => (
   </div>
 );
 
+export const PrivacyPage = () => (
+  <div className="max-w-3xl mx-auto py-20 px-4 text-slate-600 prose prose-slate">
+    <h1 className="text-3xl font-black text-slate-900 mb-10 tracking-tight">Datenschutzerklärung</h1>
+    
+    <section className="mb-8">
+      <h2 className="text-xl font-bold text-slate-900 mb-4">1. Datenerhebung und -speicherung</h2>
+      <p className="mb-4">
+        Consent Cop erhebt und speichert personenbezogene Daten nur im erforderlichen Umfang für die Bereitstellung des Dienstes. 
+        Bei der Registrierung über Google OAuth werden folgende Daten erfasst:
+      </p>
+      <ul className="list-disc list-inside space-y-2 mb-4">
+        <li>E-Mail-Adresse</li>
+        <li>Name (sofern von Google bereitgestellt)</li>
+        <li>Profilbild (optional)</li>
+        <li>Browser-Informationen</li>
+        <li>Zeitzone (als Standorthinweis)</li>
+      </ul>
+    </section>
+
+    <section className="mb-8">
+      <h2 className="text-xl font-bold text-slate-900 mb-4">2. Verwendung der Daten</h2>
+      <p className="mb-4">
+        Die erhobenen Daten werden ausschließlich für folgende Zwecke verwendet:
+      </p>
+      <ul className="list-disc list-inside space-y-2 mb-4">
+        <li>Bereitstellung und Verbesserung des Consent Cop Dienstes</li>
+        <li>Verwaltung von Benutzerkonten und Scan-Limits</li>
+        <li>Kommunikation bezüglich des Dienstes</li>
+        <li>Analyse der Nutzung zur Verbesserung der Funktionalität</li>
+      </ul>
+    </section>
+
+    <section className="mb-8">
+      <h2 className="text-xl font-bold text-slate-900 mb-4">3. Datenweitergabe</h2>
+      <p className="mb-4">
+        Wir geben Ihre personenbezogenen Daten nicht an Dritte weiter, außer:
+      </p>
+      <ul className="list-disc list-inside space-y-2 mb-4">
+        <li>Google (für OAuth-Authentifizierung) - gemäß Google's Datenschutzrichtlinie</li>
+        <li>Google Sheets (für Benutzerregistrierung) - nur wenn Sie sich registrieren</li>
+        <li>Bei gesetzlicher Verpflichtung oder gerichtlicher Anordnung</li>
+      </ul>
+    </section>
+
+    <section className="mb-8">
+      <h2 className="text-xl font-bold text-slate-900 mb-4">4. Ihre Rechte</h2>
+      <p className="mb-4">
+        Sie haben das Recht:
+      </p>
+      <ul className="list-disc list-inside space-y-2 mb-4">
+        <li>Auskunft über Ihre gespeicherten Daten zu erhalten</li>
+        <li>Berichtigung unrichtiger Daten zu verlangen</li>
+        <li>Löschung Ihrer Daten zu verlangen</li>
+        <li>Widerspruch gegen die Verarbeitung Ihrer Daten einzulegen</li>
+        <li>Datenübertragbarkeit zu verlangen</li>
+      </ul>
+      <p className="mb-4">
+        Kontaktieren Sie uns hierfür unter: <a href="mailto:privacy@consent-cop.berlin" className="text-blue-600 hover:underline">privacy@consent-cop.berlin</a>
+      </p>
+    </section>
+
+    <section className="mb-8">
+      <h2 className="text-xl font-bold text-slate-900 mb-4">5. Datensicherheit</h2>
+      <p className="mb-4">
+        Wir setzen technische und organisatorische Maßnahmen ein, um Ihre Daten vor unbefugtem Zugriff, Verlust oder Zerstörung zu schützen. 
+        Alle Datenübertragungen erfolgen verschlüsselt (TLS 1.3).
+      </p>
+    </section>
+
+    <section className="mb-8">
+      <h2 className="text-xl font-bold text-slate-900 mb-4">6. Cookies und Tracking</h2>
+      <p className="mb-4">
+        Consent Cop verwendet keine Cookies für Tracking-Zwecke. Wir verwenden nur technisch notwendige Cookies für die 
+        Funktionalität der Anwendung (z.B. Session-Management).
+      </p>
+    </section>
+
+    <section className="mb-8">
+      <h2 className="text-xl font-bold text-slate-900 mb-4">7. Änderungen dieser Datenschutzerklärung</h2>
+      <p className="mb-4">
+        Wir behalten uns vor, diese Datenschutzerklärung anzupassen. Aktuelle Version: Januar 2025.
+      </p>
+    </section>
+
+    <div className="mt-12 p-6 bg-slate-50 rounded-xl border border-slate-200">
+      <p className="text-sm text-slate-600">
+        <strong>Kontakt für Datenschutzanfragen:</strong><br/>
+        Consent Cop Berlin GmbH<br/>
+        Kurfürstendamm 213<br/>
+        10719 Berlin<br/>
+        E-Mail: <a href="mailto:privacy@consent-cop.berlin" className="text-blue-600 hover:underline">privacy@consent-cop.berlin</a>
+      </p>
+    </div>
+  </div>
+);
+
 export const SecurityPage = () => (
   <div className="max-w-4xl mx-auto py-20 px-4 text-center">
     <div className="w-20 h-20 bg-blue-600 rounded-3xl mx-auto mb-10 flex items-center justify-center text-white shadow-xl shadow-blue-200">

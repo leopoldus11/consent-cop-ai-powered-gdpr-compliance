@@ -31,64 +31,110 @@ export const ViolationList: React.FC<ViolationListProps> = ({ requests }) => {
   };
 
   const violations = requests.filter(r => r.status === 'violation');
+  const preConsentRequests = requests.filter(r => r.status === 'violation' || (r.timestamp < (requests.find(r2 => r2.status === 'allowed')?.timestamp || Infinity)));
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="p-8 border-b border-slate-100 flex items-center justify-between">
-         <div className="flex items-center space-x-3">
-           <div className="bg-red-50 p-2 rounded-lg">
-             <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
+    <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="p-4 sm:p-6 lg:p-8 border-b border-slate-100">
+         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+           <div className="flex items-start sm:items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+             <div className="bg-amber-50 p-1.5 sm:p-2 rounded-lg flex-shrink-0">
+               <svg className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+             </div>
+             <div className="flex-1 min-w-0">
+               <h3 className="text-slate-900 font-black text-base sm:text-lg mb-0.5 sm:mb-1">Pre-Consent Request Analysis</h3>
+               <p className="text-slate-400 text-[10px] sm:text-xs font-medium leading-relaxed">Requests detected before consent - review with privacy policy context</p>
+             </div>
            </div>
-           <div>
-             <h3 className="text-slate-900 font-black">Violation Forensic Deep-Dive</h3>
-             <p className="text-slate-400 text-xs font-medium">Network packets intercepted prior to consent</p>
+           <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1 flex-shrink-0">
+             <span className="bg-red-100 text-red-700 text-[9px] sm:text-[10px] font-black px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full uppercase tracking-widest border border-red-200 whitespace-nowrap">
+               {violations.length} Potential Violations
+             </span>
+             <span className="text-[8px] sm:text-[9px] text-slate-400 font-medium whitespace-nowrap">
+               {preConsentRequests.length} total pre-consent requests
+             </span>
            </div>
          </div>
-         <span className="bg-slate-100 text-slate-500 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">{violations.length} Critical Issues</span>
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full text-left">
-          <thead className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest">
+          <thead className="bg-slate-50 text-slate-400 text-[9px] sm:text-[10px] font-black uppercase tracking-widest">
             <tr>
-              <th className="px-8 py-4">Network Domain</th>
-              <th className="px-8 py-4">Audit Trigger</th>
-              <th className="px-8 py-4">Intercepted Payload</th>
-              <th className="px-8 py-4 text-right">Actions</th>
+              <th className="px-4 sm:px-6 lg:px-8 py-3 sm:py-4">Network Domain</th>
+              <th className="px-4 sm:px-6 lg:px-8 py-3 sm:py-4 hidden sm:table-cell">Audit Trigger</th>
+              <th className="px-4 sm:px-6 lg:px-8 py-3 sm:py-4">Data Detected</th>
+              <th className="px-4 sm:px-6 lg:px-8 py-3 sm:py-4 hidden md:table-cell">Risk Level</th>
+              <th className="px-4 sm:px-6 lg:px-8 py-3 sm:py-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {violations.map((req) => (
-              <tr key={req.id} className="hover:bg-slate-50/50 transition-all group">
-                <td className="px-8 py-5">
-                  <div className="font-bold text-slate-900 text-sm flex items-center">
-                    {req.domain}
-                    <div className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <svg className="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+            {violations.map((req) => {
+              // Determine risk level based on data types
+              const hasPII = req.dataTypes.some(dt => 
+                dt.includes('ID') || dt.includes('Email') || dt.includes('IP Address') || dt.includes('Fingerprint')
+              );
+              const riskLevel = hasPII ? 'High' : req.dataTypes.length > 0 ? 'Medium' : 'Low';
+              const riskColor = riskLevel === 'High' ? 'red' : riskLevel === 'Medium' ? 'amber' : 'slate';
+              
+              return (
+                <tr key={req.id} className="hover:bg-slate-50/50 transition-all group">
+                  <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
+                    <div className="font-bold text-slate-900 text-xs sm:text-sm flex items-center">
+                      {req.domain}
+                      <div className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity hidden sm:block">
+                        <svg className="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-[10px] text-slate-400 font-mono truncate max-w-[200px] mt-1">{req.url}</div>
-                </td>
-                <td className="px-8 py-5">
-                  <span className="px-2 py-1 rounded-md bg-white border border-slate-200 text-slate-600 text-[9px] font-black uppercase tracking-tighter shadow-sm">{req.type}</span>
-                </td>
-                <td className="px-8 py-5">
-                  <div className="flex flex-wrap gap-1.5">
-                    {req.dataTypes.map(dt => (
-                      <span key={dt} className="px-2 py-0.5 rounded-full bg-red-50 text-red-600 text-[10px] font-bold border border-red-100 shadow-sm">{dt}</span>
-                    ))}
-                  </div>
-                </td>
-                <td className="px-8 py-5 text-right">
-                  <button 
-                    onClick={() => handleOpenModal(req)}
-                    className="bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-slate-200"
-                  >
-                    Deep Inspect
-                  </button>
-                </td>
-              </tr>
-            ))}
+                    <div className="text-[9px] sm:text-[10px] text-slate-400 font-mono truncate max-w-[200px] sm:max-w-none mt-1">{req.url}</div>
+                    <div className="sm:hidden mt-2">
+                      <span className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-600 text-[8px] font-black uppercase tracking-tighter shadow-sm">{req.type}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 hidden sm:table-cell">
+                    <span className="px-2 py-1 rounded-md bg-white border border-slate-200 text-slate-600 text-[9px] font-black uppercase tracking-tighter shadow-sm">{req.type}</span>
+                  </td>
+                  <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
+                    <div className="flex flex-wrap gap-1 sm:gap-1.5">
+                      {req.dataTypes.length > 0 ? (
+                        req.dataTypes.slice(0, 2).map(dt => (
+                          <span key={dt} className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold border shadow-sm ${
+                            dt.includes('ID') || dt.includes('Email') || dt.includes('IP Address') || dt.includes('Fingerprint')
+                              ? 'bg-red-50 text-red-600 border-red-100'
+                              : 'bg-amber-50 text-amber-600 border-amber-100'
+                          }`}>{dt}</span>
+                        ))
+                      ) : (
+                        <span className="text-[9px] sm:text-[10px] text-slate-400 italic">No data types detected</span>
+                      )}
+                      {req.dataTypes.length > 2 && (
+                        <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium">+{req.dataTypes.length - 2}</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 hidden md:table-cell">
+                    <span className={`px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[8px] sm:text-[9px] font-black uppercase tracking-tighter border ${
+                      riskLevel === 'High' 
+                        ? 'bg-red-50 text-red-700 border-red-200'
+                        : riskLevel === 'Medium'
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                        : 'bg-slate-50 text-slate-600 border-slate-200'
+                    }`}>
+                      {riskLevel}
+                    </span>
+                  </td>
+                  <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 text-right">
+                    <button 
+                      onClick={() => handleOpenModal(req)}
+                      className="bg-slate-900 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-slate-200 whitespace-nowrap"
+                    >
+                      <span className="hidden sm:inline">Deep Inspect</span>
+                      <span className="sm:hidden">Inspect</span>
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -100,9 +146,9 @@ export const ViolationList: React.FC<ViolationListProps> = ({ requests }) => {
                <div>
                  <div className="flex items-center space-x-2 mb-1">
                    <h2 className="text-xl font-black text-slate-900">Beacon Forensic: {selectedRequest.domain}</h2>
-                   <span className="bg-red-100 text-red-600 text-[9px] font-black px-2 py-0.5 rounded uppercase">Pre-Consent Request</span>
+                   <span className="bg-amber-100 text-amber-700 text-[9px] font-black px-2 py-0.5 rounded uppercase border border-amber-200">Pre-Consent Request</span>
                  </div>
-                 <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest">Intercepted Network Payload Breakdown</p>
+                 <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest">Review with privacy policy to determine if violation</p>
                </div>
                <button onClick={() => setSelectedRequest(null)} className="p-3 hover:bg-white rounded-2xl transition-all border border-transparent hover:border-slate-100 shadow-sm">
                   <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -182,3 +228,4 @@ export const ViolationList: React.FC<ViolationListProps> = ({ requests }) => {
     </div>
   );
 };
+

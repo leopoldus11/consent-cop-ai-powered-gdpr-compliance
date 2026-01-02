@@ -328,3 +328,4 @@ Currently uses `mockScanner.ts` which provides:
 **Model Version**: gemini-3-pro-preview
 **SDK Version**: @google/genai ^1.34.0
 
+

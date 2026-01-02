@@ -452,3 +452,4 @@ npm run build
 **Version**: Enhanced Consent Cop with Gemini AI
 **Model**: gemini-3-pro-preview
 
+

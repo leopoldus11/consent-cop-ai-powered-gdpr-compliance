@@ -21,3 +21,4 @@ export async function realScan(url: string): Promise<ScanResult> {
   return response.json();
 }
 
+

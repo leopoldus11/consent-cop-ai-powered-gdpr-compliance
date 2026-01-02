@@ -80,3 +80,4 @@ Then run a scan - Gemini will analyze the new data and mention Usercentrics and 
 
 **TL;DR**: Gemini is working perfectly. The issue is that it's analyzing hardcoded mock data instead of real scan results from dertour.de.
 
+

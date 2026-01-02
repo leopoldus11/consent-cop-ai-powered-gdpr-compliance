@@ -1,16 +1,18 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { Scanner } from './components/Scanner';
 import { RiskAssessment } from './components/RiskAssessment';
 import { Timeline } from './components/Timeline';
 import { AiAdvisor } from './components/AiAdvisor';
 import { ViolationList } from './components/ViolationList';
-import { EnterprisePage, DocsPage, ImpressumPage, SecurityPage } from './components/InformationPages';
+import { EnterprisePage, DocsPage, ImpressumPage, SecurityPage, PrivacyPage } from './components/InformationPages';
 import { ScanResult, AIAnalysis, Page } from './types';
 import { mockScan } from './services/mockScanner';
 import { realScan } from './services/realScanner';
 import { analyzeScanResult } from './services/gemini';
+import { canUserScan, incrementScanCount, getUserSession } from './services/auth';
+import { generatePDF } from './services/pdfExport';
 
 // Use real scanner if API URL is configured, otherwise fall back to mock
 const USE_REAL_SCANNER = import.meta.env.VITE_USE_REAL_SCANNER === 'true' || import.meta.env.VITE_API_URL;
@@ -21,8 +23,16 @@ const App: React.FC = () => {
   const [result, setResult] = useState<ScanResult | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   const startScan = async (url: string) => {
+    // Check if user can scan
+    const scanCheck = canUserScan();
+    if (!scanCheck.allowed) {
+      alert(scanCheck.reason || 'You cannot perform a scan at this time.');
+      return;
+    }
+
     setIsScanning(true);
     setResult(null);
     setAiAnalysis(null);
@@ -34,6 +44,9 @@ const App: React.FC = () => {
         : await mockScan(url);
       
       setResult(scanData);
+      
+      // Increment scan count after successful scan
+      await incrementScanCount();
       
       setIsAiLoading(true);
       const aiData = await analyzeScanResult(scanData);
@@ -47,6 +60,23 @@ const App: React.FC = () => {
     }
   };
 
+  const handleExportPDF = async () => {
+    if (!result || !aiAnalysis) {
+      alert('No scan results available to export.');
+      return;
+    }
+
+    setIsExportingPDF(true);
+    try {
+      await generatePDF(result, aiAnalysis);
+    } catch (error: any) {
+      console.error('PDF export failed:', error);
+      alert(`Failed to generate PDF: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
+
   const renderHome = () => (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <Scanner onScanStart={startScan} isLoading={isScanning} />
@@ -54,12 +84,34 @@ const App: React.FC = () => {
       {result ? (
         <div className="py-8 grid grid-cols-1 lg:grid-cols-3 gap-12">
           <div className="lg:col-span-2 space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h2 className="text-3xl font-black text-slate-900 tracking-tight">Audit Findings</h2>
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Audit Findings</h2>
                 <p className="text-slate-500 text-sm mt-1">Deep inspection report for {result.url}</p>
               </div>
-              <div className="flex space-x-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={handleExportPDF}
+                  disabled={isExportingPDF}
+                  className="flex items-center space-x-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isExportingPDF ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span>Export PDF</span>
+                    </>
+                  )}
+                </button>
                 <span className="bg-slate-900 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg shadow-slate-200">
                   CMP: {result.bannerProvider || 'UNKNOWN'}
                 </span>
@@ -118,13 +170,13 @@ const App: React.FC = () => {
               </div>
               <h3 className="text-xl font-black mb-2 tracking-tight">Audit Technology Stack</h3>
               <p className="text-slate-400 text-sm mb-8 max-w-lg leading-relaxed">
-                Consent Cop utilizes deep network forensic interception. We capture headers, payloads, and cookies at the protocol level.
+                Detected data layer objects and JavaScript tracking infrastructure found during the scan.
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {result.dataLayers.map(dl => (
                   <div key={dl} className="bg-white/5 backdrop-blur-md border border-white/10 p-3 rounded-2xl flex items-center space-x-2">
                      <div className="w-2 h-2 rounded-full bg-blue-500 shadow-lg shadow-blue-500/50"></div>
-                     <span className="text-[10px] font-bold tracking-tight uppercase">{dl}</span>
+                     <span className="text-[10px] font-mono tracking-tight">{dl}</span>
                   </div>
                 ))}
               </div>
@@ -136,13 +188,13 @@ const App: React.FC = () => {
           </div>
         </div>
       ) : !isScanning ? (
-        <div className="mt-32 flex flex-col items-center justify-center text-center pb-32">
-           <div className="w-32 h-32 bg-white rounded-[2rem] shadow-2xl shadow-slate-100 flex items-center justify-center mb-10 transform rotate-6 hover:rotate-0 transition-transform duration-500 border border-slate-50">
-             <svg className="w-16 h-16 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
+        <div className="mt-12 sm:mt-16 lg:mt-20 flex flex-col items-center justify-center text-center pb-12 sm:pb-16 lg:pb-20 px-4">
+           <div className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 bg-white rounded-2xl sm:rounded-[2rem] shadow-xl sm:shadow-2xl shadow-slate-100 flex items-center justify-center mb-4 sm:mb-6 transform rotate-6 hover:rotate-0 transition-transform duration-500 border border-slate-50">
+             <svg className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
            </div>
-           <h2 className="text-3xl font-black text-slate-900 tracking-tight">Automated Compliance Drone</h2>
-           <p className="text-slate-500 mt-4 max-w-sm mx-auto leading-relaxed font-medium">
-             Deploy an audit drone to crawl your site. We catch pixels that fire before consent, every single time.
+           <h2 className="text-lg sm:text-xl lg:text-2xl font-black text-slate-900 tracking-tight px-4 mb-2 sm:mb-3">Automated Compliance Drone</h2>
+           <p className="text-slate-500 mt-2 sm:mt-3 max-w-sm mx-auto leading-relaxed font-medium text-xs sm:text-sm lg:text-base px-4">
+             Real-time compliance monitoring that intercepts tracking pixels before they fire. Catch every violation, every time.
            </p>
         </div>
       ) : null}
@@ -154,6 +206,7 @@ const App: React.FC = () => {
       case 'enterprise': return <EnterprisePage />;
       case 'docs': return <DocsPage />;
       case 'impressum': return <ImpressumPage />;
+      case 'privacy': return <PrivacyPage />;
       case 'security': return <SecurityPage />;
       case 'home':
       default: return renderHome();
@@ -161,7 +214,12 @@ const App: React.FC = () => {
   };
 
   return (
-    <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
+    <Layout 
+      currentPage={currentPage} 
+      onPageChange={setCurrentPage}
+      onScanStart={startScan}
+      isScanning={isScanning}
+    >
       {renderContent()}
     </Layout>
   );

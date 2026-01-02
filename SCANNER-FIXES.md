@@ -71,3 +71,4 @@ After restart, scan `https://dertour.de` and check:
 - Should show proper screenshots (not 403)
 - Should show realistic fine estimates
 
+

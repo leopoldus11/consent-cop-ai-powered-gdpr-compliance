@@ -131,7 +131,10 @@ export const CMS_SIGNATURES = {
 export const TMS_SIGNATURES = {
   gtm: {
     name: "Google Tag Manager",
-    patterns: [/googletagmanager\.com\/gtm\.js/i, /google_tag_manager/i, /window\.dataLayer/i],
+    // CRITICAL: Only detect GTM if we see actual GTM container script or google_tag_manager object
+    // DO NOT use /window\.dataLayer/i - dataLayer is used by many tools, not just GTM!
+    // Adobe Launch, Tealium, and others also use dataLayer
+    patterns: [/googletagmanager\.com\/gtm\.js/i, /google_tag_manager/i],
     dataLayerNames: ["dataLayer"],
     consentEvents: ["consent_update", "gtm.init_consent", "cookie_consent"],
     description: "Google Tag Manager with GTM Consent Mode",
@@ -262,10 +265,35 @@ export function detectConsentManagementSystem(
 /**
  * Check if GTM is actually firing (has active network requests)
  */
+/**
+ * Check if GTM container is actually firing (strict check)
+ * Only returns true if we see the actual GTM container script URL
+ * NOT just dataLayer or gtag patterns (which can be used by other tools)
+ */
 function isGTMActuallyFiring(requests: string[]): boolean {
+  // Strict check: Only return true if we see the actual GTM container script
+  // Pattern: googletagmanager.com/gtm.js?id=GTM-XXXXX
   const gtmPattern = /googletagmanager\.com\/gtm\.js\?id=GTM-[A-Z0-9]+/i;
   const isFiring = requests.some((url) => gtmPattern.test(url));
   console.log(`[TMS DETECTION] GTM firing check: ${isFiring}`);
+  return isFiring;
+}
+
+/**
+ * Check if Adobe Launch is actually firing (strong evidence)
+ * Returns true if we see Adobe Launch container script or Adobe DTM assets
+ */
+function isAdobeLaunchActuallyFiring(requests: string[]): boolean {
+  // Strong indicators of Adobe Launch:
+  // 1. assets.adobedtm.com/*/launch-*.min.js (Launch container)
+  // 2. assets.adobedtm.com with AppMeasurement.js (Adobe Analytics via Launch)
+  const launchPatterns = [
+    /assets\.adobedtm\.com\/.*\/launch-[0-9a-f]{12}\.min\.js/i, // Launch container script
+    /assets\.adobedtm\.com\/.*\/AppMeasurement\.min\.js/i, // Adobe Analytics via Launch
+    /assets\.adobedtm\.com.*\.js/i, // Any JS from assets.adobedtm.com (Launch asset host)
+  ];
+  const isFiring = requests.some((url) => launchPatterns.some((pattern) => pattern.test(url)));
+  console.log(`[TMS DETECTION] Adobe Launch firing check: ${isFiring}`);
   return isFiring;
 }
 
@@ -284,7 +312,11 @@ export function detectTagManagementSystems(
   const consentEvents: string[] = [];
   const dataLayerNames: string[] = [];
 
+  // IMPROVED: Check actual firing status with strict patterns
   const isGTMFiring = isGTMActuallyFiring(requests);
+  const isAdobeLaunchFiring = isAdobeLaunchActuallyFiring(requests);
+
+  console.log(`[TMS DETECTION] GTM actually firing: ${isGTMFiring}, Adobe Launch actually firing: ${isAdobeLaunchFiring}`);
 
   // ITERATION 17-19: More comprehensive Adobe domain detection (from screenshot)
   const adobeDomainPatterns = [
@@ -303,6 +335,10 @@ export function detectTagManagementSystems(
     console.log(`[ITER10] Matching URLs: ${matchingUrls.length}`, matchingUrls.slice(0, 3).map(u => u.substring(0, 100)));
   }
 
+  // Evidence scoring: track how each TMS was detected (network requests > script tags > page content)
+  type EvidenceStrength = 'network' | 'script' | 'content';
+  const tmsEvidence: Map<TagManagementSystem, EvidenceStrength[]> = new Map();
+
   // Check page content and network requests for TMS signatures
   Object.entries(TMS_SIGNATURES).forEach(([key, config]) => {
     const matchesContent = config.patterns.some((pattern) => pattern.test(pageContent));
@@ -310,12 +346,31 @@ export function detectTagManagementSystems(
     
     // ITERATION 2: For Adobe, also check domain patterns
     const matchesAdobeDomain = (key === 'adobe_launch' || key === 'aep_web_sdk') && hasAdobeDomain;
+    
+    // CRITICAL FIX: For GTM, only detect if we see actual GTM container script (network requests)
+    // Don't detect GTM just from content patterns if Adobe Launch is firing, because:
+    // - dataLayer is used by many tools, not just GTM
+    // - If Adobe Launch is firing, it's the actual TMS, even if gtag/dataLayer patterns exist
+    const isGTM = key === 'gtm';
+    const shouldDetectGTM = isGTM ? (matchesRequests && isGTMFiring) : true; // GTM requires actual firing, others don't
+    
+    // Track evidence strength
+    const evidence: EvidenceStrength[] = [];
+    if (matchesRequests || matchesAdobeDomain) {
+      evidence.push('network');
+    }
+    // Note: We don't separately track script tags here, but we could if needed
+    if (matchesContent) {
+      evidence.push('content');
+    }
 
-    if (matchesContent || matchesRequests || matchesAdobeDomain) {
-      detected.push(key as TagManagementSystem);
+    if ((matchesContent || matchesRequests || matchesAdobeDomain) && shouldDetectGTM) {
+      const tms = key as TagManagementSystem;
+      detected.push(tms);
+      tmsEvidence.set(tms, evidence);
       consentEvents.push(...config.consentEvents);
       dataLayerNames.push(...config.dataLayerNames);
-      console.log(`[TMS DETECTION] ✓ ${config.name} detected (content: ${matchesContent}, requests: ${matchesRequests}, domain: ${matchesAdobeDomain})`);
+      console.log(`[TMS DETECTION] ✓ ${config.name} detected (content: ${matchesContent}, requests: ${matchesRequests}, domain: ${matchesAdobeDomain}, evidence: ${evidence.join(', ')})`);
       
       if (matchesRequests || matchesAdobeDomain) {
         // Log which request matched
@@ -326,20 +381,50 @@ export function detectTagManagementSystems(
           console.log(`[TMS DETECTION]   Matched request: ${matchingRequest.substring(0, 150)}`);
         }
       }
+    } else if (isGTM && !shouldDetectGTM) {
+      console.log(`[TMS DETECTION] ⚠ GTM patterns found but GTM container not firing - skipping (likely false positive, dataLayer used by other tools)`);
     }
   });
 
+  // IMPROVED PRIORITY LOGIC: Evidence-based prioritization
   let primary: TagManagementSystem;
 
-  if (isGTMFiring) {
-    // If GTM is firing, it's the primary TMS regardless of what else is present
+  // Priority 1: If Adobe Launch is actually firing (network requests), it takes precedence
+  // Adobe Launch is the actual TMS, even if gtag/dataLayer patterns are present (which might be used by other tools)
+  if (isAdobeLaunchFiring && detected.includes('adobe_launch')) {
+    primary = "adobe_launch";
+    console.log('[TMS DETECTION] Adobe Launch is firing (network requests detected), setting as primary TMS');
+  }
+  // Priority 2: If GTM container is actually firing, it's the primary TMS
+  else if (isGTMFiring && detected.includes('gtm')) {
     primary = "gtm";
-    console.log('[TMS DETECTION] GTM is firing, setting as primary TMS');
-  } else {
-    // Otherwise, prioritize other tag managers (not CMPs)
-    const priority: TagManagementSystem[] = ["adobe_launch", "aep_web_sdk", "tealium", "segment", "gtm"];
-    primary = priority.find((tms) => detected.includes(tms)) || detected[0] || "none";
-    console.log(`[TMS DETECTION] Primary TMS (by priority): ${primary}`);
+    console.log('[TMS DETECTION] GTM container is firing (network requests detected), setting as primary TMS');
+  }
+  // Priority 3: Evidence-based priority (network requests > content patterns)
+  else {
+    // Score each detected TMS by evidence strength
+    const scoredTMS = Array.from(detected)
+      .map(tms => {
+        const evidence = tmsEvidence.get(tms) || [];
+        // Network requests = strongest evidence (score 3), content = weaker (score 1)
+        const score = evidence.filter(e => e === 'network').length * 3 + 
+                     evidence.filter(e => e === 'content').length * 1;
+        return { tms, score, evidence };
+      })
+      .sort((a, b) => b.score - a.score); // Sort by score descending
+
+    console.log(`[TMS DETECTION] Evidence scores:`, scoredTMS.map(s => `${s.tms}: ${s.score} (${s.evidence.join(', ')})`).join(', '));
+
+    // If we have scored TMS, use the highest scoring one
+    if (scoredTMS.length > 0 && scoredTMS[0].score > 0) {
+      primary = scoredTMS[0].tms;
+      console.log(`[TMS DETECTION] Primary TMS (by evidence score): ${primary} (score: ${scoredTMS[0].score})`);
+    } else {
+      // Fallback: Use priority order
+      const priority: TagManagementSystem[] = ["adobe_launch", "aep_web_sdk", "tealium", "segment", "gtm"];
+      primary = priority.find((tms) => detected.includes(tms)) || detected[0] || "none";
+      console.log(`[TMS DETECTION] Primary TMS (by priority fallback): ${primary}`);
+    }
   }
 
   if (detected.length === 0) {
@@ -364,8 +449,9 @@ export async function extractDataLayers(page: any): Promise<string[]> {
   const dataLayers: string[] = [];
 
   try {
-    // Wait a bit for data layers to be initialized
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Wait a bit for data layers to be initialized (human-like timing)
+    const jitteredDelay = 2000 + Math.random() * 1000 - 500; // 1500-2500ms
+    await new Promise(resolve => setTimeout(resolve, jitteredDelay));
     
     // Check for common data layer patterns
     const dataLayerCheck = await page.evaluate(() => {
@@ -373,6 +459,24 @@ export async function extractDataLayers(page: any): Promise<string[]> {
       const windowAny = window as any;
       
       console.log('[DATA LAYER] Checking window objects...');
+      
+      // DEBUG: Log ALL window keys to see what's available
+      const allKeys = Object.keys(windowAny);
+      const adobeKeys = allKeys.filter(k => /adobe|satellite|alloy|omtrdc|digitalData/i.test(k));
+      console.log(`[DATA LAYER DEBUG] Total window keys: ${allKeys.length}`);
+      console.log(`[DATA LAYER DEBUG] Adobe-related keys: ${adobeKeys.slice(0, 20).join(', ')}`);
+      
+      // DEBUG: Check adobeDataLayer specifically
+      if ('adobeDataLayer' in windowAny) {
+        console.log(`[DATA LAYER DEBUG] adobeDataLayer EXISTS in window`);
+        console.log(`[DATA LAYER DEBUG] adobeDataLayer type: ${typeof windowAny.adobeDataLayer}`);
+        console.log(`[DATA LAYER DEBUG] adobeDataLayer value:`, windowAny.adobeDataLayer);
+        if (Array.isArray(windowAny.adobeDataLayer)) {
+          console.log(`[DATA LAYER DEBUG] adobeDataLayer is array with length: ${windowAny.adobeDataLayer.length}`);
+        }
+      } else {
+        console.log(`[DATA LAYER DEBUG] adobeDataLayer DOES NOT EXIST in window`);
+      }
       
       // Check window.dataLayer (Google Tag Manager)
       if (typeof windowAny.dataLayer !== 'undefined' && windowAny.dataLayer) {
@@ -389,8 +493,11 @@ export async function extractDataLayers(page: any): Promise<string[]> {
       
       // FIX: Check adobeDataLayer (Adobe Experience Platform) - improved detection
       if (typeof windowAny.adobeDataLayer !== 'undefined') {
+        console.log('[DATA LAYER DEBUG] adobeDataLayer check: typeof check passed');
         const originalLayer = windowAny._original_adobeDataLayer;
         const layer = originalLayer || windowAny.adobeDataLayer;
+        console.log(`[DATA LAYER DEBUG] layer value:`, layer);
+        console.log(`[DATA LAYER DEBUG] layer type: ${typeof layer}, isArray: ${Array.isArray(layer)}, isNull: ${layer === null}, isUndefined: ${layer === undefined}`);
         // Check if it exists (even if empty array or object)
         if (layer !== null && layer !== undefined) {
           if (Array.isArray(layer) && layer.length > 0) {
@@ -406,7 +513,11 @@ export async function extractDataLayers(page: any): Promise<string[]> {
             console.log('[DATA LAYER] Found: adobeDataLayer (exists)');
             layers.push('adobeDataLayer');
           }
+        } else {
+          console.log('[DATA LAYER DEBUG] adobeDataLayer check: layer is null or undefined');
         }
+      } else {
+        console.log('[DATA LAYER DEBUG] adobeDataLayer check: typeof check FAILED (undefined)');
       }
       
       // Check digitalData (Adobe Analytics)
@@ -431,8 +542,8 @@ export async function extractDataLayers(page: any): Promise<string[]> {
         layers.push('utag_data');
       }
       
-      // Check for any adobe-related objects
-      const adobeKeys = Object.keys(windowAny).filter(key => {
+      // Check for any additional adobe-related objects (different filter than debug check above)
+      const additionalAdobeKeys = Object.keys(windowAny).filter(key => {
         const keyLower = key.toLowerCase();
         return (keyLower.includes('adobe') || 
                 keyLower.includes('omniture') ||
@@ -442,9 +553,9 @@ export async function extractDataLayers(page: any): Promise<string[]> {
                typeof windowAny[key] === 'object' &&
                windowAny[key] !== null;
       });
-      if (adobeKeys.length > 0) {
-        console.log(`[DATA LAYER] Found Adobe-related keys: ${adobeKeys.join(', ')}`);
-        adobeKeys.forEach(key => {
+      if (additionalAdobeKeys.length > 0) {
+        console.log(`[DATA LAYER] Found additional Adobe-related keys: ${additionalAdobeKeys.join(', ')}`);
+        additionalAdobeKeys.forEach(key => {
           if (!layers.includes(key)) layers.push(key);
         });
       }
@@ -502,7 +613,9 @@ export async function extractDataLayers(page: any): Promise<string[]> {
 export async function setupDataLayerProxies(page: any): Promise<void> {
   console.log('[DATA LAYER] Setting up Proxy-based interception...');
   
-  await page.evaluateOnNewDocument(() => {
+  // Use addInitScript for Playwright, evaluateOnNewDocument for Puppeteer
+  if (typeof page.addInitScript === 'function') {
+    await page.addInitScript(() => {
     const createDataLayerProxy = (name: string) => {
       const windowAny = window as any;
       const originalLayer = windowAny[name] || [];
@@ -529,7 +642,31 @@ export async function setupDataLayerProxies(page: any): Promise<void> {
     createDataLayerProxy("adobeDataLayer");
     
     console.log('[DATA LAYER] Proxy interception set up for dataLayer, digitalData, utag_data, adobeDataLayer');
-  });
+    });
+  } else if (typeof page.evaluateOnNewDocument === 'function') {
+    // Puppeteer fallback
+    await page.evaluateOnNewDocument(() => {
+      const createDataLayerProxy = (name: string) => {
+        const windowAny = window as any;
+        const originalLayer = windowAny[name] || [];
+        windowAny[`_original_${name}`] = originalLayer;
+        windowAny[name] = new Proxy(originalLayer, {
+          set(target, prop, value) {
+            if (prop !== "length") {
+              console.log(`[DATA LAYER] ${name}.push detected:`, JSON.stringify(value).substring(0, 100));
+            }
+            target[prop as any] = value;
+            return true;
+          },
+        });
+      };
+      createDataLayerProxy("dataLayer");
+      createDataLayerProxy("digitalData");
+      createDataLayerProxy("utag_data");
+      createDataLayerProxy("adobeDataLayer");
+      console.log('[DATA LAYER] Proxy interception set up for dataLayer, digitalData, utag_data, adobeDataLayer');
+    });
+  }
 }
 
 // Legacy compatibility functions
