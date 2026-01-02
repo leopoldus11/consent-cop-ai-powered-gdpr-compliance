@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { canUserScan, getUserSession } from '../services/auth';
+import { UpgradePrompt } from './UpgradePrompt';
 
 interface ScannerProps {
   onScanStart: (url: string) => void;
@@ -253,6 +254,27 @@ export const Scanner: React.FC<ScannerProps> = ({ onScanStart, isLoading }) => {
               <span className="hidden sm:inline">Please sign in with Google to start scanning. Free tier includes 5 scans per week.</span>
               <span className="sm:hidden">Sign in to start scanning. 5 free scans per week.</span>
             </p>
+          </div>
+        )}
+
+        {/* Upgrade Prompt (when logged in but scan limit reached) */}
+        {!isLoggedOut && !scanCheck.allowed && (
+          <div 
+            ref={messageRef}
+            style={{
+              marginTop: 'var(--equal-spacing, 1rem)',
+            }}
+          >
+            <UpgradePrompt
+              tier={scanCheck.tier}
+              reason={scanCheck.reason}
+              scansRemaining={scanCheck.scansRemaining}
+              onUpgrade={(tier) => {
+                // TODO: Implement Stripe payment flow
+                console.log('Upgrade to:', tier);
+                alert(`Upgrade to ${tier} tier - Payment integration coming soon!`);
+              }}
+            />
           </div>
         )}
 

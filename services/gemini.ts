@@ -21,9 +21,21 @@ const extractJSON = (text: string): string => {
   return text.trim();
 };
 
-// Get API key from environment (supports both Vite-native and define-based approaches)
-const getApiKey = (): string => {
-  // Try Vite-native approach first
+// Get API key from environment or user's custom key (BYOK)
+const getApiKey = async (): Promise<string> => {
+  // First, try to get user's custom API key (BYOK)
+  try {
+    const { getCustomApiKey } = await import('./auth.js');
+    const customKey = await getCustomApiKey();
+    if (customKey) {
+      console.log('[API KEY] Using user-provided BYOK key');
+      return customKey;
+    }
+  } catch (error) {
+    console.log('[API KEY] No custom key found, using default');
+  }
+  
+  // Fallback to environment variable
   if (import.meta.env.VITE_API_KEY) {
     return import.meta.env.VITE_API_KEY;
   }
@@ -31,7 +43,7 @@ const getApiKey = (): string => {
   if (process.env.API_KEY) {
     return process.env.API_KEY;
   }
-  throw new Error('Gemini API key not found. Please set VITE_API_KEY in your .env.local file.');
+  throw new Error('Gemini API key not found. Please set VITE_API_KEY in your .env.local file or provide your own key in settings.');
 };
 
 // Note: GoogleGenAI client initialization moved inside functions to pick up the most 
@@ -51,7 +63,8 @@ export const analyzeScanResult = async (result: ScanResult, options?: { useCache
   }
   
   // Always initialize GoogleGenAI inside the function to use the latest API key
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  const apiKey = await getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
   
   // Use cheaper Flash model for simpler analysis if requested
   const model = useFlashModel ? 'gemini-1.5-flash' : 'gemini-3-pro-preview';
@@ -172,7 +185,8 @@ export const getDeepBeaconAnalysis = async (domain: string, params: Record<strin
   }
   
   // Always initialize GoogleGenAI inside the function to use the latest API key
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  const apiKey = await getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
   
   // Use cheaper Flash model for simpler analysis if requested
   const model = useFlashModel ? 'gemini-1.5-flash' : 'gemini-3-pro-preview';
