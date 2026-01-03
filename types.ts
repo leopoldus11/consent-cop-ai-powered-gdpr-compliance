@@ -64,6 +64,17 @@ export interface ScanResult {
       detectedTechnologies?: string[];
     };
   };
+  performanceMetrics?: {
+    totalDuration: number;
+    browserLaunch: number;
+    navigation: number;
+    bannerDetection: number;
+    consentInteraction: number;
+    postConsentWait: number;
+    detectionAnalysis: number;
+    geminiAnalysis: number;
+    networkProcessing: number;
+  };
 }
 
 export interface AIAnalysis {

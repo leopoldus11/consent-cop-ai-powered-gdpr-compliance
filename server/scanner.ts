@@ -7,10 +7,10 @@ import { calculateRiskScore, estimateFineRange } from './scoring.js';
 import { detectTMSWithGemini } from './geminiTMSDetection.js';
 import { detectDataLayersWithGemini } from './geminiDataLayerDetection.js';
 import { detectDataLayersFromHTML, extractAnalyticsConfiguration } from './enhancedDetection.js';
-import { 
-  jitteredDelay, 
-  humanActionDelay, 
-  getRealisticUserAgent, 
+import {
+  jitteredDelay,
+  humanActionDelay,
+  getRealisticUserAgent,
   getRealisticHeaders,
   checkBotDetection,
   getNextProxy,
@@ -24,6 +24,43 @@ import { setupScriptRewriting } from './scriptRewriter.js';
  */
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Performance Monitoring Utility
+ */
+class ScanTimer {
+  private times: Record<string, number> = {};
+  private starts: Record<string, number> = {};
+
+  start(label: string) {
+    this.starts[label] = performance.now();
+  }
+
+  end(label: string) {
+    if (this.starts[label]) {
+      this.times[label] = (this.times[label] || 0) + (performance.now() - this.starts[label]);
+    }
+  }
+
+  getMetrics() { return this.times; }
+}
+
+/**
+ * Smart Wait: Waits for network activity to settle or a max timeout.
+ * Replaces hard sleeps with intelligent monitoring.
+ */
+async function smartNetworkWait(page: Page, maxTimeout: number): Promise<void> {
+  try {
+    // Wait for network idle (no requests for 500ms) or timeout
+    // Using 'networkidle' state which is ideal for SPAs/Tracking scripts
+    console.log(`[SMART WAIT] Waiting for network to settle (max ${maxTimeout}ms)...`);
+    const startTime = Date.now();
+    await page.waitForLoadState('networkidle', { timeout: maxTimeout });
+    console.log(`[SMART WAIT] Network settled early (took ${Date.now() - startTime}ms)`);
+  } catch (e) {
+    console.log(`[SMART WAIT] Network did not fully settle, proceeded after timeout (${maxTimeout}ms)`);
+  }
 }
 
 interface NetworkRequest {
@@ -40,42 +77,49 @@ interface NetworkRequest {
  * Uses Playwright with advanced stealth techniques to bypass Cloudflare/DataDome
  */
 export async function scanWebsite(
-  url: string, 
+  url: string,
   options?: {
     proxyPool?: ProxyConfig[];
     skipBotCheck?: boolean;
   }
 ): Promise<ScanResult> {
+  // Perform URL normalization
+  // ... existing normalization code ... (implicitly handled by surrounding context if I don't touch it, but here I'm inserting after line 48)
+
+  const timer = new ScanTimer();
+  timer.start('totalDuration');
+
   // CRITICAL: Fix URL normalization - handle typos and ensure valid protocol
   let targetUrl = url.trim();
-  
+
   // Remove any leading/trailing whitespace
   targetUrl = targetUrl.trim();
-  
+
   // Fix common typos in protocol
   targetUrl = targetUrl.replace(/^htps:\/\//i, 'https://');
   targetUrl = targetUrl.replace(/^http:\/\//i, 'https://'); // Prefer https
-  
+
   // Check if it starts with a valid protocol
   if (!targetUrl.match(/^https?:\/\//i)) {
     // No valid protocol, prepend https://
     targetUrl = `https://${targetUrl}`;
   }
-  
+
   // Remove duplicate protocols (can happen if user enters http://https://...)
   targetUrl = targetUrl.replace(/^(https?:\/\/)+/i, 'https://');
-  
+
   // Remove trailing slashes for cleaner URLs
   targetUrl = targetUrl.replace(/\/+$/, '');
-  
+
   console.log(`[SCAN] URL normalization: "${url}" -> "${targetUrl}"`);
-  
+
   let browser: Browser | null = null;
   let context: BrowserContext | null = null;
   let inPageMonitor: { getRequests: () => InPageRequest[]; cleanup: () => void } | null = null;
   let swMonitor: { getRequests: () => ServiceWorkerRequest[]; cleanup: () => void } | null = null;
-  
+
   try {
+    timer.start('browserLaunch');
     // ANTI-BOT: Launch Playwright browser with anti-bot detection bypass
     console.log('[ANTI-BOT] Launching Playwright browser...');
     const proxy = getNextProxy(options?.proxyPool);
@@ -88,7 +132,7 @@ export async function scanWebsite(
         '--disable-blink-features=AutomationControlled',
       ],
     });
-    
+
     context = await browser.newContext({
       viewport: { width: 1920, height: 1080 },
       userAgent: getRealisticUserAgent(),
@@ -102,9 +146,9 @@ export async function scanWebsite(
       } : undefined,
       javaScriptEnabled: true,
     });
-    
+
     const page = await context.newPage();
-    
+
     // FIX 1: CDP Override - Hide automation markers at protocol level
     try {
       const client = await context.newCDPSession(page);
@@ -131,16 +175,16 @@ export async function scanWebsite(
     } catch (error: any) {
       console.warn('[CDP] CDP override failed (non-critical):', error.message);
     }
-    
+
     // ITERATION 23: CRITICAL - Enable request interception to capture ALL requests
     // Standard listener may miss requests that are blocked/intercepted
     const allRequests: NetworkRequest[] = [];
     let consentClickTimestamp: number | null = null;
     let bannerExists = false;
-    
+
     // ANTI-BOT: Set up in-page network monitoring
     inPageMonitor = await setupInPageNetworkMonitor(page);
-    
+
     // NEW: Set up Service Worker capture (intercepts ALL fetch calls)
     try {
       swMonitor = await setupServiceWorkerCapture(page);
@@ -148,7 +192,7 @@ export async function scanWebsite(
     } catch (error: any) {
       console.warn('[SW] Service Worker setup failed (non-critical):', error.message);
     }
-    
+
     // NEW: Set up script rewriting to inject data layer capture
     try {
       await setupScriptRewriting(page);
@@ -156,7 +200,7 @@ export async function scanWebsite(
     } catch (error: any) {
       console.warn('[SCRIPT REWRITE] Script rewriting setup failed (non-critical):', error.message);
     }
-    
+
     console.log('[ANTI-BOT] Enabling Playwright request listeners...');
     page.on('request', (request) => {
       const url = request.url();
@@ -169,18 +213,18 @@ export async function scanWebsite(
         resourceType: request.resourceType(),
       };
       allRequests.push(networkRequest);
-      
+
       // Log Adobe requests immediately
       if (/adobe|omtrdc|2o7|adobedc|AppMeasurement|adobedtm|assets\.adobedtm/i.test(url)) {
         console.log(`[ANTI-BOT] ✓✓✓ CAPTURED Adobe request: ${request.resourceType()} ${url.substring(0, 200)}`);
       }
-      
+
       // Log first 30 requests for debugging
       if (allRequests.length <= 30) {
         console.log(`[REQUEST] ${allRequests.length}. ${request.resourceType()}: ${url.substring(0, 120)}`);
       }
     });
-    
+
     // Listen to console logs
     page.on('console', (msg) => {
       const text = msg.text();
@@ -188,24 +232,28 @@ export async function scanWebsite(
         console.log(`[BROWSER] ${text}`);
       }
     });
-    
+
     // ANTI-BOT: Remove automation indicators
     await page.addInitScript(() => {
       Object.defineProperty(navigator, 'webdriver', { get: () => false });
       (window as any).chrome = { runtime: {} };
     });
-    
+
     // Set up data layer proxies BEFORE navigation
     await setupDataLayerProxies(page);
-    
+
+    // Set up data layer proxies BEFORE navigation
+    await setupDataLayerProxies(page);
+    timer.end('browserLaunch');
+
     console.log('[ANTI-BOT] Request listener set up. Starting navigation...');
 
     // ANTI-BOT: Navigate with human-like timing
     console.log(`[SCAN] Navigating to: ${targetUrl}`);
     const startTime = Date.now();
-    
+
     await humanActionDelay();
-    
+
     try {
       await page.goto(targetUrl, {
         waitUntil: 'networkidle',
@@ -227,26 +275,29 @@ export async function scanWebsite(
     }
 
     const navigationTime = Date.now() - startTime;
+    timer.end('navigation');
     console.log(`[SCAN] Navigation completed in ${navigationTime}ms. Captured ${allRequests.length} requests`);
 
     // CRITICAL: Wait for JavaScript objects to initialize (Adobe, GTM, etc.)
     console.log('[SCAN] Waiting for JavaScript objects to initialize...');
+    timer.start('bannerDetection');
     await waitForJavaScriptObjects(page);
-    
+
     // Check for banner AFTER objects are initialized
     bannerExists = await checkForBanner(page);
+    timer.end('bannerDetection');
     console.log(`[SCAN] Banner found: ${bannerExists}`);
 
     // Get page content for detection (after load event)
     const pageContent = await page.content();
 
     // CRITICAL: Capture screenshot BEFORE consent (should show banner)
-    const screenshotBefore = (await page.screenshot({ 
+    const screenshotBefore = (await page.screenshot({
       type: 'png',
-      fullPage: false 
+      fullPage: false
     })) as Buffer;
     const screenshotBeforeBase64 = screenshotBefore.toString('base64');
-    
+
     // DEBUG: Log requests captured BEFORE consent click
     console.log(`[DEBUG] Requests captured BEFORE consent click: ${allRequests.length}`);
     const preClickAdobe = allRequests.filter(r => /adobe|omtrdc|2o7|adobedc|AppMeasurement|adobedtm/i.test(r.url));
@@ -254,12 +305,13 @@ export async function scanWebsite(
 
     // FIX: Comprehensive consent click and wait logic
     if (bannerExists) {
+      timer.start('consentInteraction');
       console.log('[BANNER] Attempting to click consent banner...');
       const clickResult = await tryClickConsentBanner(page);
       if (clickResult.clicked) {
         consentClickTimestamp = clickResult.timestamp;
         console.log(`[BANNER] Consent clicked at ${consentClickTimestamp}`);
-        
+
         // FIX: Wait for banner to actually disappear before taking after screenshot
         console.log('[BANNER] Waiting for banner to disappear...');
         try {
@@ -268,10 +320,10 @@ export async function scanWebsite(
               const banner = document.querySelector('[id*="usercentrics"], [id*="consent"], [class*="uc-"], [class*="usercentrics"]');
               if (!banner) return true;
               const htmlEl = banner as HTMLElement;
-              return htmlEl.offsetParent === null || 
-                     htmlEl.style.display === 'none' ||
-                     htmlEl.offsetWidth === 0 ||
-                     htmlEl.offsetHeight === 0;
+              return htmlEl.offsetParent === null ||
+                htmlEl.style.display === 'none' ||
+                htmlEl.offsetWidth === 0 ||
+                htmlEl.offsetHeight === 0;
             },
             { timeout: 10000 }
           );
@@ -280,15 +332,22 @@ export async function scanWebsite(
           console.log('[BANNER] Banner may still be visible');
           await jitteredDelay(3000, 0.3); // Fallback wait with jitter
         }
-        
-        // ITERATION 14: Wait MUCH longer (20+ seconds) to capture ALL Adobe requests (screenshot shows many load after consent)
-        console.log('[ITER14] Waiting 15s for Adobe scripts to load after consent (screenshot shows 20 Adobe requests)...');
-        await delay(15000);
-        
-        // ITERATION 14: Additional wait for network activity to settle
-        console.log('[ITER14] Waiting additional 5s for network activity...');
-        await delay(5000);
-        
+        timer.end('consentInteraction');
+
+        // SMART OPTIMIZATION: Replace hard 20s wait with smart network idle check
+        // Max wait is 15s, but will proceed sooner if network is quiet
+        console.log('[OPTIMIZATION] Using smart wait for post-consent activity...');
+
+        // Anti-Race Condition: Wait 1s for requests to actually start firing upon click
+        await delay(1000);
+
+        timer.start('postConsentWait');
+        await smartNetworkWait(page, 15000);
+        timer.end('postConsentWait');
+
+        // Brief buffer for stragglers
+        await delay(2000);
+
         // ITERATION 16: Log all requests to see what we captured
         console.log(`[ITER16] Total requests captured: ${allRequests.length}`);
         const adobeRequestsAfter = allRequests.filter(r => /adobe|omtrdc|2o7|adobedc|AppMeasurement|adobedtm/i.test(r.url) && r.timestamp >= consentClickTimestamp);
@@ -308,22 +367,22 @@ export async function scanWebsite(
     }
 
     // FIX: Capture screenshot AFTER consent (should NOT show banner if click worked)
-    const screenshotAfter = (await page.screenshot({ 
+    const screenshotAfter = (await page.screenshot({
       type: 'png',
-      fullPage: false 
+      fullPage: false
     })) as Buffer;
     const screenshotAfterBase64 = screenshotAfter.toString('base64');
-    
+
     // DEBUG: Verify banner is gone in after screenshot
     if (bannerExists && consentClickTimestamp) {
       const bannerStillExists = await page.evaluate(() => {
         const banner = document.querySelector('[id*="usercentrics"], [id*="consent"], [class*="uc-"], [class*="usercentrics"]');
         if (!banner) return false;
         const htmlEl = banner as HTMLElement;
-        return htmlEl.offsetParent !== null && 
-               htmlEl.style.display !== 'none' &&
-               htmlEl.offsetWidth > 0 &&
-               htmlEl.offsetHeight > 0;
+        return htmlEl.offsetParent !== null &&
+          htmlEl.style.display !== 'none' &&
+          htmlEl.offsetWidth > 0 &&
+          htmlEl.offsetHeight > 0;
       });
       if (bannerStillExists) {
         console.log('[WARNING] Banner still visible after consent click!');
@@ -348,7 +407,7 @@ export async function scanWebsite(
       return workerInfo;
     }).catch(() => []);
     console.log(`[ITER33] Workers detected:`, JSON.stringify(workers));
-    
+
     // Extract script URLs and JavaScript context
     const [dynamicScriptUrls, jsContext] = await Promise.all([
       page.evaluate(() => {
@@ -372,40 +431,19 @@ export async function scanWebsite(
       });
       return layerNames;
     }).catch(() => []);
-    
     if (capturedDataLayers.length > 0) {
       console.log(`[SCRIPT REWRITE] Found data layers via script rewriting: ${capturedDataLayers.join(', ')}`);
     }
-    
-    // ANTI-BOT: Extract data layers with human-like timing
-    let dataLayers = await extractDataLayers(page);
-    
-    // Merge captured data layers
-    capturedDataLayers.forEach(layer => {
-      if (!dataLayers.includes(layer)) {
-        dataLayers.push(layer);
-      }
-    });
-    
-    // ANTI-BOT: If no data layers but objects exist, try multiple times with jittered delays
-    if (dataLayers.length === 0 && (jsContext.adobeDetected || jsContext.gtmDetected)) {
-      console.log('[ANTI-BOT] Objects detected but no data layers, retrying with human-like timing...');
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        await jitteredDelay(2000 * attempt, 0.3); // Jittered increasing delay: ~2s, ~4s, ~6s
-        const dataLayersRetry = await extractDataLayers(page);
-        if (dataLayersRetry.length > 0) {
-          console.log(`[ANTI-BOT] Found data layers on attempt ${attempt}: ${dataLayersRetry.join(', ')}`);
-          dataLayers = dataLayersRetry;
-          break;
-        }
-      }
-    }
+
+    // ANTI-BOT: Extract data layers logic moved to parallel execution below
+    console.log('[OPTIMIZATION] Data layer extraction scheduled in parallel...');
+
 
     // NEW: Merge Service Worker requests with Playwright requests
     if (swMonitor) {
       const swRequests = swMonitor.getRequests();
       console.log(`[SW] Service Worker captured ${swRequests.length} additional requests`);
-      
+
       // Convert SW requests to NetworkRequest format and merge
       swRequests.forEach(swReq => {
         const networkReq: NetworkRequest = {
@@ -416,7 +454,7 @@ export async function scanWebsite(
           timestamp: swReq.timestamp,
           resourceType: 'xhr', // Service Workers typically intercept XHR/fetch
         };
-        
+
         // Only add if not already captured
         if (!allRequests.find(r => r.url === swReq.url && Math.abs(r.timestamp - swReq.timestamp) < 1000)) {
           allRequests.push(networkReq);
@@ -424,13 +462,13 @@ export async function scanWebsite(
         }
       });
     }
-    
+
     // CRITICAL: Split requests correctly - if consent was NOT clicked, 
     // use a timestamp FAR in the future so all requests are "before"
     const splitTimestamp = consentClickTimestamp || Number.MAX_SAFE_INTEGER;
     const requestsBefore = allRequests.filter(r => r.timestamp < splitTimestamp);
     const requestsAfter = allRequests.filter(r => r.timestamp >= splitTimestamp);
-    
+
     // DEBUG: Log Adobe requests BEFORE consent (these are violations!)
     const adobeBeforeConsent = requestsBefore.filter(r => /adobe|omtrdc|2o7|adobedc|AppMeasurement|adobedtm|assets\.adobedtm/i.test(r.url));
     console.log(`[CRITICAL] Adobe requests BEFORE consent (violations!): ${adobeBeforeConsent.length}`);
@@ -454,7 +492,7 @@ export async function scanWebsite(
     const allRequestUrls = allRequests.map(r => r.url);
     const allUrls = [...new Set([...allRequestUrls, ...dynamicScriptUrls])];
     console.log(`[DETECTION] Total URLs for detection: ${allUrls.length} (${allRequests.length} requests + ${dynamicScriptUrls.length} script tags)`);
-    
+
     // CRITICAL: Log Adobe-related URLs - these should be captured BEFORE consent!
     const adobeUrls = allUrls.filter(u => /adobe|omtrdc|2o7|adobedc|adobedtm|AppMeasurement|assets\.adobedtm/i.test(u));
     console.log(`[CRITICAL] Adobe-related URLs in ALL requests: ${adobeUrls.length}`);
@@ -471,34 +509,84 @@ export async function scanWebsite(
       return inlineScripts.map(s => s.textContent || s.innerHTML).join(' ');
     });
 
-    // Detect CMP
-    console.log('\n[DETECTION] Detecting CMP...');
-    const cmsDetection = detectConsentManagementSystem(pageContent, allUrls);
-    const bannerProvider = cmsDetection.primary === 'none' ? null : CMS_SIGNATURES[cmsDetection.primary]?.name || cmsDetection.primary;
+    // PARALLEL OPTIMIZATION: Run independent detections concurrently
+    console.log('\n[OPTIMIZATION] Running parallel detection tasks...');
+
+    timer.start('detectionAnalysis');
+    // 1. CMP Detection (independent)
+    const cmsPromise = Promise.resolve().then(() => detectConsentManagementSystem(pageContent, allUrls));
+
+    // 2. Data Layer Extraction -> TMS Detection (sequential dependency)
+    // ANTI-BOT: Extract data layers with human-like timing
+    // We keep existing logic but wrapped in promise chain
+    const tmsChainPromise = (async () => {
+      let dataLayers = await extractDataLayers(page);
+
+      // Merge captured data layers
+      capturedDataLayers.forEach(layer => {
+        if (!dataLayers.includes(layer)) {
+          dataLayers.push(layer);
+        }
+      });
+
+      // ANTI-BOT: If no data layers but objects exist, try multiple times with jittered delays
+      if (dataLayers.length === 0 && (jsContext.adobeDetected || jsContext.gtmDetected)) {
+        console.log('[ANTI-BOT] Objects detected but no data layers, retrying with human-like timing...');
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          await jitteredDelay(1000 * attempt, 0.3); // Reduced jitter for speed
+          const dataLayersRetry = await extractDataLayers(page);
+          if (dataLayersRetry.length > 0) {
+            console.log(`[ANTI-BOT] Found data layers on attempt ${attempt}: ${dataLayersRetry.join(', ')}`);
+            dataLayers = dataLayersRetry;
+            break;
+          }
+        }
+      }
+
+      console.log('\n[DETECTION] Detecting TMS...');
+      console.log(`[ITER3] Passing ${allUrls.length} URLs, ${dataLayers.length} data layers to TMS detection`);
+      const tmsDetection = detectTagManagementSystems(pageContent, allUrls, dataLayers);
+
+      return { dataLayers, tmsDetection };
+    })();
+
+    // Await all parallel tasks
+    const [cmsDetection, tmsResult] = await Promise.all([cmsPromise, tmsChainPromise]);
+
+    // Unwrap results
+    let dataLayers = tmsResult.dataLayers;
+    const tmsDetection = tmsResult.tmsDetection;
+
+    // Resume sequential logic with results
+    timer.end('detectionAnalysis');
+    console.log('\n[DETECTION] CMP detection complete');
+    let bannerProvider = cmsDetection.primary === 'none' ? null : CMS_SIGNATURES[cmsDetection.primary]?.name || cmsDetection.primary;
+
+    // FIX: Fallback to visual detection if provider is unknown
+    if (!bannerProvider && bannerExists) {
+      bannerProvider = 'Unknown (Visually Detected)';
+      console.log('[DETECTION] Banner visually detected but provider unknown - forcing CMP detection');
+    }
+
     console.log(`[DETECTION] CMP detected: ${bannerProvider || 'none'} (confidence: ${cmsDetection.confidence})`);
 
-        // ITERATION 26: CRITICAL - Check ALL sources for Adobe (page content, script tags, inline scripts)
-        console.log('\n[ITER26] Comprehensive Adobe detection check...');
-        // Enhanced patterns: include Adobe Client Data Layer patterns
-        const adobeInContent = /assets\.adobedtm\.com|AppMeasurement|adobedtm|omtrdc|2o7|adobeDataLayer|_satellite|adobeLaunchScriptUrl|adobeAMCVId|adobeTargetToken|@adobe\/adobe-client-data-layer|Adobe Client Data Layer|ACDL/i.test(pageContent);
-        const adobeInScripts = dynamicScriptUrls.some(url => /assets\.adobedtm\.com|AppMeasurement|adobedtm|omtrdc|2o7/i.test(url));
-        const adobeInInlineScripts = /assets\.adobedtm\.com|AppMeasurement|adobedtm|omtrdc|2o7|adobeDataLayer|_satellite|adobeLaunchScriptUrl|adobeAMCVId|adobeTargetToken|@adobe\/adobe-client-data-layer|Adobe Client Data Layer/i.test(inlineScriptsContent);
-        console.log(`[ITER26] Adobe in page content: ${adobeInContent}, Adobe in script tags: ${adobeInScripts}, Adobe in inline scripts: ${adobeInInlineScripts}`);
-        
-        // ITERATION 3: Detect TMS - pass ALL requests (before + after consent)
-        console.log('\n[DETECTION] Detecting TMS...');
-        console.log(`[ITER3] Passing ${allUrls.length} URLs, ${dataLayers.length} data layers to TMS detection`);
-        const tmsDetection = detectTagManagementSystems(pageContent, allUrls, dataLayers);
-        
-        // ITERATION 26: Force detect Adobe if found in ANY source (content/scripts/inline)
-        const adobeFound = adobeInContent || adobeInScripts || adobeInInlineScripts;
-        if (adobeFound && !tmsDetection.detected.includes('adobe_launch') && !tmsDetection.detected.includes('aep_web_sdk')) {
-          console.log('[ITER26] Force-adding Adobe Launch (found in page content/scripts/inline)');
-          tmsDetection.detected.push('adobe_launch');
-          tmsDetection.dataLayerNames.push('digitalData', '_satellite');
-        }
-        
-    
+    // ITERATION 26: CRITICAL - Check ALL sources for Adobe (page content, script tags, inline scripts)
+    console.log('\n[ITER26] Comprehensive Adobe detection check...');
+    // Enhanced patterns: include Adobe Client Data Layer patterns
+    const adobeInContent = /assets\.adobedtm\.com|AppMeasurement|adobedtm|omtrdc|2o7|adobeDataLayer|_satellite|adobeLaunchScriptUrl|adobeAMCVId|adobeTargetToken|@adobe\/adobe-client-data-layer|Adobe Client Data Layer|ACDL/i.test(pageContent);
+    const adobeInScripts = dynamicScriptUrls.some(url => /assets\.adobedtm\.com|AppMeasurement|adobedtm|omtrdc|2o7/i.test(url));
+    const adobeInInlineScripts = /assets\.adobedtm\.com|AppMeasurement|adobedtm|omtrdc|2o7|adobeDataLayer|_satellite|adobeLaunchScriptUrl|adobeAMCVId|adobeTargetToken|@adobe\/adobe-client-data-layer|Adobe Client Data Layer/i.test(inlineScriptsContent);
+    console.log(`[ITER26] Adobe in page content: ${adobeInContent}, Adobe in script tags: ${adobeInScripts}, Adobe in inline scripts: ${adobeInInlineScripts}`);
+
+    // ITERATION 26: Force detect Adobe if found in ANY source (content/scripts/inline)
+    const adobeFound = adobeInContent || adobeInScripts || adobeInInlineScripts;
+    if (adobeFound && !tmsDetection.detected.includes('adobe_launch') && !tmsDetection.detected.includes('aep_web_sdk')) {
+      console.log('[ITER26] Force-adding Adobe Launch (found in page content/scripts/inline)');
+      tmsDetection.detected.push('adobe_launch');
+      tmsDetection.dataLayerNames.push('digitalData', '_satellite');
+    }
+
+
     // Merge JavaScript context findings (removed duplicate)
     if (jsContext.adobeDetected && !tmsDetection.detected.includes('aep_web_sdk') && !tmsDetection.detected.includes('adobe_launch')) {
       console.log('[DETECTION] Adobe detected in JavaScript context - adding to detected TMS');
@@ -512,7 +600,7 @@ export async function scanWebsite(
         tmsDetection.detected.push('adobe_launch');
       }
     }
-    
+
     // CRITICAL FIX: Only add GTM if we see actual GTM container script (google_tag_manager object)
     // Don't add GTM just because dataLayer exists - dataLayer is used by many tools (Adobe Launch, Tealium, etc.)
     // Check if GTM is actually firing (has actual container script)
@@ -524,19 +612,22 @@ export async function scanWebsite(
     } else if (jsContext.gtmDetected && !isGTMActuallyFiring) {
       console.log('[DETECTION] ⚠ GTM patterns found (dataLayer/google_tag_manager) but GTM container not firing - skipping (likely false positive, dataLayer used by other tools like Adobe Launch)');
     }
-    
+
     // GEMINI AI FALLBACK: If no TMS detected, use Gemini AI to analyze HTML/scripts
     let usingGeminiFallback = false;
     let geminiTMSResult: any = null;
     const initialTMSDetected = tmsDetection.detected.filter(tms => tms !== 'none');
-    
+
+
     if (initialTMSDetected.length === 0) {
       console.log('\n[GEMINI FALLBACK] No TMS detected via standard methods. Using Gemini AI to analyze HTML/scripts...');
       usingGeminiFallback = true;
-      
+
       // Call Gemini AI to analyze
+      timer.start('geminiAnalysis');
       geminiTMSResult = await detectTMSWithGemini(pageContent, dynamicScriptUrls, inlineScriptsContent);
-      
+      timer.end('geminiAnalysis');
+
       if (geminiTMSResult.detectedTMS.length > 0) {
         console.log(`[GEMINI FALLBACK] Gemini detected TMS: ${geminiTMSResult.detectedTMS.join(', ')} (confidence: ${geminiTMSResult.confidence})`);
         // Map Gemini's TMS names to our internal types
@@ -563,13 +654,16 @@ export async function scanWebsite(
         console.log('[GEMINI FALLBACK] Gemini AI found no TMS in page content');
       }
     }
-    
+
+
     // GEMINI DATA LAYER FALLBACK: If no data layers detected, use Gemini AI to analyze HTML/scripts
     let geminiDataLayerResult: any = null;
     if (dataLayers.length === 0) {
       console.log('\n[GEMINI DATA LAYER FALLBACK] No data layers detected via standard methods. Using Gemini AI to analyze HTML/scripts...');
+      timer.start('geminiAnalysis');
       geminiDataLayerResult = await detectDataLayersWithGemini(pageContent, dynamicScriptUrls, inlineScriptsContent);
-      
+      timer.end('geminiAnalysis');
+
       if (geminiDataLayerResult.detectedDataLayers.length > 0) {
         console.log(`[GEMINI DATA LAYER FALLBACK] Gemini detected data layers: ${geminiDataLayerResult.detectedDataLayers.join(', ')} (confidence: ${geminiDataLayerResult.confidence})`);
         dataLayers = geminiDataLayerResult.detectedDataLayers;
@@ -577,11 +671,11 @@ export async function scanWebsite(
         console.log('[GEMINI DATA LAYER FALLBACK] Gemini AI found no data layers in page content');
       }
     }
-    
+
     let tmsDetected = tmsDetection.detected
       .filter(tms => tms !== 'none')
       .map(tms => TMS_SIGNATURES[tms]?.name || tms);
-    
+
     console.log(`[DETECTION] TMS detected: ${tmsDetected.join(', ') || 'none'}`);
     if (tmsDetected.length > 0) {
       tmsDetection.detected.forEach(tms => {
@@ -593,7 +687,9 @@ export async function scanWebsite(
     }
 
     // Process requests into RequestLog format with consentState tagging
+    timer.start('networkProcessing');
     const allRequestLogs = processRequests(requestsBefore, requestsAfter, bannerProvider, consentClickTimestamp);
+    timer.end('networkProcessing');
 
     // Separate violations from compliant requests
     const violations = allRequestLogs.filter(r => r.status === 'violation');
@@ -608,7 +704,13 @@ export async function scanWebsite(
 
     // Estimate fine range
     const fineRange = estimateFineRange(violations, riskScore);
-    
+
+    timer.end('totalDuration');
+    const metrics = timer.getMetrics();
+
+    console.log('\n========== PERFORMANCE METRICS ==========');
+    console.table(metrics);
+
     console.log(`Fine range: €${fineRange.min.toLocaleString()} - €${fineRange.max.toLocaleString()}`);
 
     // Build result
@@ -630,8 +732,8 @@ export async function scanWebsite(
       tmsDetected,
       fineRange,
       scanMethod: usingGeminiFallback ? 'html_analysis' : 'network',
-      scanNote: usingGeminiFallback 
-        ? 'TMS detection via HTML/script analysis (network requests may be blocked by bot detection)' 
+      scanNote: usingGeminiFallback
+        ? 'TMS detection via HTML/script analysis (network requests may be blocked by bot detection)'
         : undefined,
       detectionDetails: {
         tmsEvidence: geminiTMSResult?.evidence || undefined,
@@ -640,6 +742,17 @@ export async function scanWebsite(
         dataLayerDetectionSource: geminiDataLayerResult?.detectionSource || undefined,
         analyticsConfiguration: extractAnalyticsConfiguration(pageContent, inlineScriptsContent, dynamicScriptUrls),
       },
+      performanceMetrics: {
+        totalDuration: metrics.totalDuration,
+        browserLaunch: metrics.browserLaunch,
+        navigation: metrics.navigation,
+        bannerDetection: metrics.bannerDetection,
+        consentInteraction: metrics.consentInteraction,
+        postConsentWait: metrics.postConsentWait,
+        detectionAnalysis: metrics.detectionAnalysis,
+        geminiAnalysis: metrics.geminiAnalysis,
+        networkProcessing: metrics.networkProcessing
+      }
     };
 
     return result;
@@ -669,8 +782,8 @@ async function waitForJavaScriptObjects(page: Page): Promise<void> {
     const found = await page.waitForFunction(
       () => {
         const w = window as any;
-        return !!(w.dataLayer || w.adobeDataLayer || w._satellite || w.digitalData || 
-                 w.s || w.google_tag_manager || w.adobe || w.utag_data);
+        return !!(w.dataLayer || w.adobeDataLayer || w._satellite || w.digitalData ||
+          w.s || w.google_tag_manager || w.adobe || w.utag_data);
       },
       { timeout: 10000 }
     );
@@ -764,7 +877,7 @@ async function extractJavaScriptContext(page: Page): Promise<{
       const content = script.textContent || script.innerHTML || '';
       const src = script.getAttribute('src') || '';
       const fullContent = content + ' ' + src;
-      
+
       if (/adobeDataLayer|alloy\.js|_satellite|omtrdc|2o7\.net|adobedtm|adobe\.com|adobeDataLayer/i.test(fullContent)) {
         adobeDetected = true;
         adobeInScripts = true;
@@ -776,7 +889,7 @@ async function extractJavaScriptContext(page: Page): Promise<{
         gtmDetected = true;
       }
     }
-    
+
     if (adobeInScripts) {
       console.log('[JS CONTEXT] Adobe patterns found in script content');
     }
@@ -797,7 +910,7 @@ async function checkForBanner(page: Page): Promise<boolean> {
   try {
     // Wait a bit for banner to potentially appear (human-like timing)
     await jitteredDelay(2000, 0.3);
-    
+
     const found = await page.evaluate(() => {
       const selectors = [
         '[id*="usercentrics"]',
@@ -809,27 +922,27 @@ async function checkForBanner(page: Page): Promise<boolean> {
         '[class*="cookie"]',
         '[id*="onetrust"]',
       ];
-      
+
       // Check if any selector matches visible elements
       for (const sel of selectors) {
         const elements = document.querySelectorAll(sel);
         for (const el of Array.from(elements)) {
           const htmlEl = el as HTMLElement;
-          if (htmlEl.offsetParent !== null || 
-              htmlEl.style.display !== 'none' ||
-              htmlEl.offsetWidth > 0 ||
-              htmlEl.offsetHeight > 0) {
+          if (htmlEl.offsetParent !== null ||
+            htmlEl.style.display !== 'none' ||
+            htmlEl.offsetWidth > 0 ||
+            htmlEl.offsetHeight > 0) {
             return true; // Element is visible
           }
         }
       }
-      
+
       // Check for Usercentrics script
       const scripts = Array.from(document.querySelectorAll('script[src]'));
       if (scripts.some(s => /usercentrics/i.test(s.getAttribute('src') || ''))) {
         return true;
       }
-      
+
       // Check page HTML content
       return /usercentrics|uc-|consent.*banner|cookie.*banner/i.test(document.body.innerHTML);
     });
@@ -844,18 +957,18 @@ async function checkForBanner(page: Page): Promise<boolean> {
  * FIX 3: Try to click consent banner with improved detection
  */
 async function tryClickConsentBanner(page: Page): Promise<{ clicked: boolean; timestamp: number }> {
-  // CRITICAL: Get timestamp BEFORE clicking (for accurate request tracking)
-  const clickTimestamp = Date.now();
-  
+  // Capture start time for fallback/failure cases
+  const startTimestamp = Date.now();
+
   try {
-    // Wait for banner to be fully loaded and interactive
+    // Wait for banner to be fully loaded and interactive (reduced timeout for speed)
     await page.waitForSelector('[id*="usercentrics"], [class*="uc-"], [class*="consent"], [id*="consent"]', {
       state: 'visible',
-      timeout: 5000
+      timeout: 2500
     }).catch(() => {
       console.log('[BANNER] Banner selector not found, trying direct click...');
     });
-    
+
     // Try multiple selectors in order of specificity
     const selectors = [
       'button[id*="uc-accept"]',
@@ -866,7 +979,7 @@ async function tryClickConsentBanner(page: Page): Promise<{ clicked: boolean; ti
       'button:has-text("Akzeptieren")',
       'button:has-text("Accept")',
     ];
-    
+
     for (const selector of selectors) {
       try {
         const button = page.locator(selector).first();
@@ -881,7 +994,11 @@ async function tryClickConsentBanner(page: Page): Promise<{ clicked: boolean; ti
                 x: box.x + box.width / 2,
                 y: box.y + box.height / 2,
               });
-              await jitteredDelay(200, 0.4);
+              // Reduced delay for speed while maintaining human characteristics
+              await jitteredDelay(100, 0.2);
+
+              // CRITICAL: Capture timestamp RIGHT BEFORE click
+              const clickTimestamp = Date.now();
               await cursor.click();
               console.log(`[BANNER] ✓ Clicked with ghost-cursor: ${selector}`);
               return { clicked: true, timestamp: clickTimestamp };
@@ -889,7 +1006,9 @@ async function tryClickConsentBanner(page: Page): Promise<{ clicked: boolean; ti
           } catch (cursorError) {
             // Fallback to regular click
           }
-          
+
+          // CRITICAL: Capture timestamp RIGHT BEFORE click
+          const clickTimestamp = Date.now();
           // Regular Playwright click
           await button.click({ timeout: 2000 });
           console.log(`[BANNER] ✓ Clicked: ${selector}`);
@@ -899,55 +1018,57 @@ async function tryClickConsentBanner(page: Page): Promise<{ clicked: boolean; ti
         continue;
       }
     }
-    
+
     // Fallback: JavaScript click for buttons with text matching
+    // We capture timestamp before evaluating
+    const jsClickTimestamp = Date.now();
     const clicked = await page.evaluate(() => {
       // ITERATION 13: Look for German "Alles akzeptieren" button (from screenshot)
       const buttons = Array.from(document.querySelectorAll('button, a, [role="button"]'));
       const acceptButton = buttons.find(btn => {
         const text = (btn.textContent || '').toLowerCase().trim();
         return (text.includes('alles akzeptieren') ||  // ITERATION 13: German "accept all"
-                text.includes('accept all') ||
-                text === 'alles akzeptieren' || 
-                text.includes('akzeptieren') || 
-                text.includes('alle akzeptieren') ||
-                text.includes('alle zustimmen') ||
-                text.includes('consent')) &&
-               text.length < 50;
+          text.includes('accept all') ||
+          text === 'alles akzeptieren' ||
+          text.includes('akzeptieren') ||
+          text.includes('alle akzeptieren') ||
+          text.includes('alle zustimmen') ||
+          text.includes('consent')) &&
+          text.length < 50;
       });
-      
+
       if (acceptButton && (acceptButton as HTMLElement).offsetParent !== null) {
         (acceptButton as HTMLElement).click();
         return true;
       }
-      
+
       // Check for Usercentrics specific elements
       const ucElements = document.querySelectorAll('[id*="usercentrics"], [class*="uc-"], [class*="usercentrics"]');
       for (const el of Array.from(ucElements)) {
         const ucButtons = el.querySelectorAll('button');
         for (const btn of Array.from(ucButtons)) {
           const text = (btn.textContent || '').toLowerCase().trim();
-          if ((text.includes('accept') || text.includes('akzeptieren')) && 
-              (btn as HTMLElement).offsetParent !== null) {
+          if ((text.includes('accept') || text.includes('akzeptieren')) &&
+            (btn as HTMLElement).offsetParent !== null) {
             (btn as HTMLButtonElement).click();
             return true;
           }
         }
       }
-      
+
       return false;
     });
-    
+
     if (clicked) {
       console.log('[BANNER] ✓ Clicked via JavaScript fallback');
-      return { clicked: true, timestamp: clickTimestamp };
+      return { clicked: true, timestamp: jsClickTimestamp };
     }
-    
+
     console.log('[BANNER] ✗ No consent button found');
-    return { clicked: false, timestamp: clickTimestamp };
+    return { clicked: false, timestamp: startTimestamp };
   } catch (error: any) {
     console.log(`[BANNER] Error clicking: ${error.message}`);
-    return { clicked: false, timestamp: clickTimestamp };
+    return { clicked: false, timestamp: startTimestamp };
   }
 }
 
@@ -975,17 +1096,17 @@ function processRequests(
       const urlObj = new URL(req.url);
       const domain = urlObj.hostname;
       const isTracking = isTrackingRequest(req.url, domain);
-      
+
       if (isTracking) {
         trackingCount++;
       }
-      
+
       // Skip only the main document
       if (req.resourceType === 'document') {
         skippedCount++;
         return;
       }
-      
+
       // Skip essential resources if not tracking
       if (isEssentialResource(req.url) && !isTracking) {
         skippedCount++;
@@ -1000,13 +1121,13 @@ function processRequests(
       const isCMPInitialization = isCMPRelatedRequest(req.url, cmpProvider);
       const isStrictlyNecessary = isStrictlyNecessaryRequest(req.url, domain);
       const hasPII = inferDataTypes(req.url, req.headers, req.postData).length > 0;
-      
+
       // Violation = tracking request + has PII + CMP present + NOT CMP initialization + NOT strictly necessary
-      const isViolation = isTracking && 
-                         cmpProvider !== null && 
-                         hasPII && 
-                         !isCMPInitialization && 
-                         !isStrictlyNecessary;
+      const isViolation = isTracking &&
+        cmpProvider !== null &&
+        hasPII &&
+        !isCMPInitialization &&
+        !isStrictlyNecessary;
 
       requestLogs.push({
         id: `req_${index}`,
@@ -1023,7 +1144,7 @@ function processRequests(
       skippedCount++;
     }
   });
-  
+
   console.log(`[PROCESS] Processed ${requestLogs.length} requests, skipped ${skippedCount}, found ${trackingCount} tracking requests`);
 
   // Process post-consent requests (should be allowed)
@@ -1033,7 +1154,7 @@ function processRequests(
 
     try {
       const domain = new URL(req.url).hostname;
-      
+
       if (req.resourceType === 'document' || isEssentialResource(req.url)) {
         return;
       }
@@ -1064,7 +1185,7 @@ function processRequests(
 function isTrackingRequest(url: string, domain: string): boolean {
   const urlLower = url.toLowerCase();
   const domainLower = domain.toLowerCase();
-  
+
   // Extract base domain from URL for comparison
   let urlDomain = '';
   try {
@@ -1073,7 +1194,7 @@ function isTrackingRequest(url: string, domain: string): boolean {
   } catch {
     // Invalid URL, skip domain check
   }
-  
+
   const trackingDomains = [
     'google-analytics.com',
     'googletagmanager.com',
@@ -1130,7 +1251,7 @@ function isTrackingRequest(url: string, domain: string): boolean {
 
   const matchesDomain = trackingDomains.some(d => domainLower.includes(d));
   const matchesPattern = trackingPatterns.some(p => p.test(urlLower));
-  
+
   return matchesDomain || matchesPattern;
 }
 
@@ -1155,7 +1276,7 @@ function isEssentialResource(url: string): boolean {
  */
 function isCMPRelatedRequest(url: string, cmpProvider: string | null): boolean {
   if (!cmpProvider) return false;
-  
+
   const cmpPatterns: Record<string, RegExp[]> = {
     'Usercentrics': [/usercentrics\.eu/i, /usercentrics\.com/i, /uc-/i, /UC_UI/i],
     'OneTrust': [/onetrust\.com/i, /optanon/i, /cookiepro/i],
@@ -1164,7 +1285,7 @@ function isCMPRelatedRequest(url: string, cmpProvider: string | null): boolean {
     'Quantcast': [/quantcast\.com/i, /quantserve\.com/i, /__tcfapi/i],
     'Didomi': [/didomi\.io/i, /didomi/i, /privacy-center\.org/i],
   };
-  
+
   const patterns = cmpPatterns[cmpProvider] || [];
   return patterns.some(p => p.test(url));
 }
@@ -1175,10 +1296,10 @@ function isCMPRelatedRequest(url: string, cmpProvider: string | null): boolean {
 function isStrictlyNecessaryRequest(url: string, domain: string): boolean {
   // First-party analytics that don't collect PII might be considered strictly necessary
   // But this is a gray area - we'll be conservative and only mark obvious cases
-  
+
   // CDN, fonts, images, stylesheets are strictly necessary
   if (isEssentialResource(url)) return true;
-  
+
   // First-party requests that are clearly functional (not tracking)
   const functionalPatterns = [
     /\/api\//i,
@@ -1186,13 +1307,13 @@ function isStrictlyNecessaryRequest(url: string, domain: string): boolean {
     /\/assets\//i,
     /\.(jpg|jpeg|png|gif|svg|webp|ico)$/i,
   ];
-  
+
   // Only if it's first-party (same domain or subdomain)
   const urlObj = new URL(url);
   const urlDomain = urlObj.hostname.replace(/^www\./, '');
   const baseDomain = domain.replace(/^www\./, '');
   const isFirstParty = urlDomain === baseDomain || urlDomain.endsWith(`.${baseDomain}`);
-  
+
   return isFirstParty && functionalPatterns.some(p => p.test(url));
 }
 
@@ -1217,11 +1338,11 @@ function inferDataTypes(
 
   // Check URL parameters
   const urlParams = new URLSearchParams(url.split('?')[1] || '');
-  
+
   if (urlParams.has('cid') || urlParams.has('client_id') || urlParams.has('visitor_id')) {
     dataTypes.push('Client ID');
   }
-  
+
   if (urlParams.has('uid') || urlParams.has('user_id')) {
     dataTypes.push('User ID');
   }
