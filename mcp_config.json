@@ -1,0 +1,10 @@
+{
+    "mcpServers": {
+        "project-orchestrator": {
+            "command": "node",
+            "args": [
+                "/Users/leopoldus11/dev/consent-cop---ai-powered-gdpr-compliance/tools/orchestrator-mcp/build/index.js"
+            ]
+        }
+    }
+}

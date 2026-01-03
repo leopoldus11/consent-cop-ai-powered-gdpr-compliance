@@ -28,3 +28,4 @@ dist-ssr
 !DEVELOPMENT.md
 .vercel
 .env*.local
+.agent-lock.json

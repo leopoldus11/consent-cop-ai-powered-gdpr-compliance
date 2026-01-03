@@ -1,0 +1,26 @@
+{
+    "name": "orchestrator-mcp",
+    "version": "1.0.0",
+    "description": "MCP server for managing agent locks and strict division of labor",
+    "main": "build/index.js",
+    "scripts": {
+        "build": "tsc",
+        "start": "node build/index.js"
+    },
+    "keywords": [
+        "mcp",
+        "orchestrator",
+        "agent",
+        "lock"
+    ],
+    "author": "Antigravity",
+    "license": "ISC",
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.0.1",
+        "zod": "^3.23.8"
+    },
+    "devDependencies": {
+        "@types/node": "^20.11.24",
+        "typescript": "^5.3.3"
+    }
+}
