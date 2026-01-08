@@ -19,6 +19,8 @@ import {
 import { setupInPageNetworkMonitor, type InPageRequest } from './inPageNetworkMonitor.js';
 import { setupServiceWorkerCapture, type ServiceWorkerRequest } from './serviceWorkerCapture.js';
 import { setupScriptRewriting } from './scriptRewriter.js';
+import { parseBeaconUrl } from './services/PayloadForensics.js'; // Import Forensic Service
+import { filterSuspects, batchAudit } from './services/BatchAuditor.js'; // Import Batch Auditor
 /**
  * Delay helper - replaces deprecated page.waitForTimeout()
  */
@@ -40,7 +42,12 @@ class ScanTimer {
   end(label: string) {
     if (this.starts[label]) {
       this.times[label] = (this.times[label] || 0) + (performance.now() - this.starts[label]);
+      delete this.starts[label]; // Clear start time to allow re-timing
     }
+  }
+
+  isActive(label: string): boolean {
+    return !!this.starts[label];
   }
 
   getMetrics() { return this.times; }
@@ -242,8 +249,7 @@ export async function scanWebsite(
     // Set up data layer proxies BEFORE navigation
     await setupDataLayerProxies(page);
 
-    // Set up data layer proxies BEFORE navigation
-    await setupDataLayerProxies(page);
+
     timer.end('browserLaunch');
 
     console.log('[ANTI-BOT] Request listener set up. Starting navigation...');
@@ -251,6 +257,7 @@ export async function scanWebsite(
     // ANTI-BOT: Navigate with human-like timing
     console.log(`[SCAN] Navigating to: ${targetUrl}`);
     const startTime = Date.now();
+    timer.start('navigation');
 
     await humanActionDelay();
 
@@ -622,9 +629,9 @@ export async function scanWebsite(
     if (initialTMSDetected.length === 0) {
       console.log('\n[GEMINI FALLBACK] No TMS detected via standard methods. Using Gemini AI to analyze HTML/scripts...');
       usingGeminiFallback = true;
+      if (!timer.isActive('geminiAnalysis')) timer.start('geminiAnalysis');
 
       // Call Gemini AI to analyze
-      timer.start('geminiAnalysis');
       geminiTMSResult = await detectTMSWithGemini(pageContent, dynamicScriptUrls, inlineScriptsContent);
       timer.end('geminiAnalysis');
 
@@ -660,7 +667,7 @@ export async function scanWebsite(
     let geminiDataLayerResult: any = null;
     if (dataLayers.length === 0) {
       console.log('\n[GEMINI DATA LAYER FALLBACK] No data layers detected via standard methods. Using Gemini AI to analyze HTML/scripts...');
-      timer.start('geminiAnalysis');
+      if (!timer.isActive('geminiAnalysis')) timer.start('geminiAnalysis');
       geminiDataLayerResult = await detectDataLayersWithGemini(pageContent, dynamicScriptUrls, inlineScriptsContent);
       timer.end('geminiAnalysis');
 
@@ -754,6 +761,19 @@ export async function scanWebsite(
         networkProcessing: metrics.networkProcessing
       }
     };
+
+    // ========== BATCH AUDITOR INTEGRATION ==========
+    // Automatically audit high-risk requests with AI
+    try {
+      const suspects = filterSuspects(allRequestLogs);
+      if (suspects.length > 0) {
+        console.log(`[BATCH AUDIT] Found ${suspects.length} suspect requests, sending to AI...`);
+        const aiVerdicts = await batchAudit(suspects);
+        result.aiVerdicts = aiVerdicts;
+      }
+    } catch (auditError: any) {
+      console.error(`[BATCH AUDIT] Error during automated audit: ${auditError.message}`);
+    }
 
     return result;
   } finally {
@@ -1139,6 +1159,7 @@ function processRequests(
         dataTypes: inferDataTypes(req.url, req.headers, req.postData),
         parameters: extractParameters(req.url, req.postData),
         consentState: 'pre-consent', // Tagged based on consentClickTimestamp
+        decodedPayload: isTracking ? parseBeaconUrl(req.url, `req_${index}`) : undefined, // FORENSIC INTEGRATION
       });
     } catch (error) {
       skippedCount++;
@@ -1169,6 +1190,7 @@ function processRequests(
         dataTypes: inferDataTypes(req.url, req.headers, req.postData),
         parameters: extractParameters(req.url, req.postData),
         consentState: 'post-consent', // Tagged based on consentClickTimestamp
+        decodedPayload: isTrackingRequest(req.url, domain) ? parseBeaconUrl(req.url, `req_after_${index}`) : undefined, // FORENSIC INTEGRATION
       });
     } catch (error) {
       // Skip invalid URLs

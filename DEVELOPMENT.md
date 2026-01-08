@@ -293,3 +293,4 @@ types.ts             # TypeScript interfaces (ScanResult, RequestLog, etc.)
 *Branch: main*
 *Commit: b453fe4*
 
+

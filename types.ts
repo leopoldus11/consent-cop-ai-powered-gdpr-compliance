@@ -11,6 +11,44 @@ export interface RequestLog {
   dataTypes: string[];
   parameters?: Record<string, string>;
   consentState: 'pre-consent' | 'post-consent'; // Tagged based on consentClickTimestamp
+  decodedPayload?: ParsedBeacon;
+  legalJustification?: string;
+  discrepancyScore?: number;
+}
+
+export enum BeaconType {
+  ADOBE = 'Adobe Analytics',
+  GA4 = 'Google Analytics 4',
+  META = 'Meta (Facebook) Pixel',
+  TIKTOK = 'TikTok Pixel',
+  UNKNOWN = 'Unknown'
+}
+
+export interface ParameterInfo {
+  key: string;
+  value: string;
+  friendlyName?: string;
+  description?: string;
+  category: ParameterCategory;
+  isMandatory?: boolean;
+}
+
+export enum ParameterCategory {
+  CORE = 'Core Configuration',
+  TRAFFIC = 'Traffic Sources',
+  ECOMMERCE = 'E-commerce',
+  CUSTOM = 'Custom Dimensions/Variables',
+  SYSTEM = 'System/Environment',
+  USER = 'User Data',
+  OTHER = 'Other'
+}
+
+export interface ParsedBeacon {
+  id: string;
+  type: BeaconType;
+  rawUrl: string;
+  parameters: ParameterInfo[];
+  errors: string[];
 }
 
 export interface ScanResult {
@@ -75,6 +113,7 @@ export interface ScanResult {
     geminiAnalysis: number;
     networkProcessing: number;
   };
+  aiVerdicts?: AIVerdict[]; // Batch AI Audit Results
 }
 
 export interface AIAnalysis {
@@ -94,4 +133,12 @@ export interface BeaconAnalysis {
   dataExfiltration: string;
   forensicEvidence: string;
   remediation: string;
+}
+
+// AI-powered Batch Audit Verdicts
+export interface AIVerdict {
+  requestId: string;
+  riskLevel: 'High' | 'Medium' | 'Low';
+  violationType: 'PII Leak' | 'Granular Tracking' | 'Fingerprinting' | 'None';
+  explanation: string;
 }
