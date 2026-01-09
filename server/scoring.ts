@@ -1,4 +1,11 @@
-import { RequestLog } from '../types.js';
+import { RequestLog, ParityOfEaseResult, GranularityResult, AccessibilityResult } from '../types.js';
+
+// GDPR Audit wrapper type
+interface GDPRAuditResult {
+  parityOfEase?: ParityOfEaseResult;
+  granularity?: GranularityResult;
+  accessibility?: AccessibilityResult;
+}
 
 /**
  * Calculate compliance risk score based on violations
@@ -9,13 +16,17 @@ import { RequestLog } from '../types.js';
  * - 50-69: C (Moderate risk)
  * - 70-89: D (High risk)
  * - 90-100: F (Critical risk)
+ * 
+ * 2026 UPDATE: Includes GPC violations, UI bias detection, and GDPR 2026 Module
  */
 export function calculateRiskScore(
   violations: RequestLog[],
   totalRequests: number,
-  hasCMP: boolean
+  hasCMP: boolean,
+  siteViolations?: string[],
+  gdprAudit?: GDPRAuditResult
 ): number {
-  if (violations.length === 0) {
+  if (violations.length === 0 && (!siteViolations || siteViolations.length === 0) && !gdprAudit) {
     return hasCMP ? 20 : 40; // Good score if no violations
   }
 
@@ -56,6 +67,63 @@ export function calculateRiskScore(
     score += 10; // High volume of data collection
   } else if (totalDataTypes > 5) {
     score += 5;
+  }
+
+  // NEW: Factor 5: 2026 Compliance Violations (0-20 points)
+  if (siteViolations && siteViolations.length > 0) {
+    // GPC_IGNORED is a critical CCPA violation (2026 enforcement)
+    if (siteViolations.some(v => v.includes('GPC_IGNORED'))) {
+      score += 15; // Major violation
+    }
+    
+    // UI_BIAS_DETECTED is an EDPB dark pattern violation
+    if (siteViolations.some(v => v.includes('UI_BIAS_DETECTED'))) {
+      score += 10; // Significant violation
+    }
+    
+    // VISUAL_CONFIRMATION_MISSING (if we add it)
+    if (siteViolations.some(v => v.includes('VISUAL_CONFIRMATION_MISSING'))) {
+      score += 5;
+    }
+  }
+
+  // NEW: Factor 6 - GDPR 2026 Module Violations (0-60 points)
+  if (gdprAudit) {
+    console.log('[SCORING] Applying GDPR 2026 penalties...');
+    
+    // 1. Parity of Ease (0-30 points) - CRITICAL
+    // Missing first-layer reject = automatic HIGH RISK
+    if (gdprAudit.parityOfEase && !gdprAudit.parityOfEase.firstLayerRejectVisible) {
+      score += 30;
+      console.log('[SCORING] +30 points: No first-layer Reject button (EDPB Guidelines 05/2020)');
+    }
+    
+    // 2. Pre-Ticked Toggles (0-20 points) - CRITICAL
+    // Article 7 GDPR: Consent must be freely given
+    if (gdprAudit.granularity?.preTickedNonEssential) {
+      const penalty = gdprAudit.granularity.violationSeverity === 'MAJOR' ? 20 : 10;
+      score += penalty;
+      console.log(`[SCORING] +${penalty} points: Pre-ticked non-essential toggles (Article 7 GDPR)`);
+    }
+    
+    // 3. Data Residency (0-10 points)
+    // Cross-border transfers to non-adequate countries
+    const nonAdequateTransfers = violations.filter(v => 
+      v.dataResidency?.adequacyStatus === 'NON_ADEQUATE'
+    ).length;
+    
+    if (nonAdequateTransfers > 0) {
+      const penalty = Math.min(10, nonAdequateTransfers * 2);
+      score += penalty;
+      console.log(`[SCORING] +${penalty} points: ${nonAdequateTransfers} non-adequate data transfer(s) (Article 44-49 GDPR)`);
+    }
+    
+    // 4. Accessibility (0-5 points)
+    // European Accessibility Act (EAA) 2025
+    if (gdprAudit.accessibility && !gdprAudit.accessibility.wcag22Compliant) {
+      score += 5;
+      console.log('[SCORING] +5 points: WCAG 2.2 accessibility failure (EAA 2025)');
+    }
   }
 
   // Cap at 100

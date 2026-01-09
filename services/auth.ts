@@ -156,64 +156,9 @@ export function clearUserSession(): void {
  * For accurate checks, use getUserSession() directly
  */
 export function canUserScan(): { allowed: boolean; reason?: string; scansRemaining: number; tier: SubscriptionTier } {
-  // For synchronous checks, we'll use a cached version
-  // The actual session is async now due to decryption
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) {
-      return { allowed: false, reason: 'Please sign in to use Consent Cop', scansRemaining: 0, tier: 'free' };
-    }
-    
-    const session: EncryptedUserSession = JSON.parse(stored);
-    const tier = session.subscriptionTier || 'free';
-    const limits = TIER_LIMITS[tier];
-    
-    // BYOK and Enterprise have unlimited scans
-    if (tier === 'byok' || tier === 'enterprise') {
-      return { allowed: true, scansRemaining: Infinity, tier };
-    }
-    
-    // Check limits based on tier
-    if (tier === 'free') {
-      if (session.scanCount >= (limits.weekly || WEEKLY_SCAN_LIMIT)) {
-        const resetDate = new Date(session.weeklyResetDate);
-        const daysUntilReset = Math.ceil((resetDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-        return {
-          allowed: false,
-          reason: `Weekly scan limit reached. Resets in ${daysUntilReset} day${daysUntilReset !== 1 ? 's' : ''}`,
-          scansRemaining: 0,
-          tier
-        };
-      }
-      return {
-        allowed: true,
-        scansRemaining: (limits.weekly || WEEKLY_SCAN_LIMIT) - session.scanCount,
-        tier
-      };
-    } else {
-      // Paid tiers (monthly limits)
-      const monthlyLimit = session.monthlyScanLimit || limits.monthly || 0;
-      if (session.scanCount >= monthlyLimit) {
-        const resetDate = session.monthlyResetDate ? new Date(session.monthlyResetDate) : null;
-        if (resetDate) {
-          const daysUntilReset = Math.ceil((resetDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-          return {
-            allowed: false,
-            reason: `Monthly scan limit reached. Resets in ${daysUntilReset} day${daysUntilReset !== 1 ? 's' : ''}`,
-            scansRemaining: 0,
-            tier
-          };
-        }
-      }
-      return {
-        allowed: true,
-        scansRemaining: monthlyLimit - session.scanCount,
-        tier
-      };
-    }
-  } catch (error) {
-    return { allowed: false, reason: 'Please sign in to use Consent Cop', scansRemaining: 0, tier: 'free' };
-  }
+  // BYPASS: Always allow scanning for development/testing
+  // The user requested to have the backend functionality run without having to be logged in
+  return { allowed: true, scansRemaining: 999, tier: 'pro' };
 }
 
 /**

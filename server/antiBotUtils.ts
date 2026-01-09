@@ -88,9 +88,10 @@ export function getRealisticUserAgent(): string {
 
 /**
  * Get realistic HTTP headers matching Chrome profile
+ * Includes GPC signal for 2026 CCPA compliance testing
  */
-export function getRealisticHeaders(): Record<string, string> {
-  return {
+export function getRealisticHeaders(options?: { includeGPC?: boolean }): Record<string, string> {
+  const headers: Record<string, string> = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
     'Accept-Language': 'en-US,en;q=0.9',
     'Accept-Encoding': 'gzip, deflate, br',
@@ -104,6 +105,13 @@ export function getRealisticHeaders(): Record<string, string> {
     'sec-ch-ua-mobile': '?0',
     'sec-ch-ua-platform': '"macOS"',
   };
+
+  // Add GPC header if requested (CCPA 2026 testing)
+  if (options?.includeGPC) {
+    headers['Sec-GPC'] = '1';
+  }
+
+  return headers;
 }
 
 /**

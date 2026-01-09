@@ -65,8 +65,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
 
   return (
     <AuthProvider>
-      <div className={`flex flex-col bg-slate-50 ${currentPage === 'home' ? 'h-[100dvh] lg:min-h-screen overflow-hidden' : 'min-h-screen'}`}>
-      <header className={`bg-white border-b border-slate-200 ${currentPage === 'home' ? 'absolute top-0 left-0 right-0 z-50' : 'sticky top-0 z-50'} safe-area-top`}>
+      <div className={`flex flex-col ${currentPage === 'home' ? 'bg-[#020617] min-h-screen overflow-x-hidden bg-grid-slate' : 'bg-slate-50 min-h-screen'}`}>
+      <header className={`${currentPage === 'home' ? 'bg-[#020617]/40 backdrop-blur-xl border-b border-white/5 absolute top-0 left-0 right-0 z-50' : 'bg-white border-b border-slate-200 sticky top-0 z-50'} safe-area-top`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             {/* Desktop: Logo on left */}
@@ -77,12 +77,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
               }} 
               className="hidden lg:flex items-center space-x-3 hover:opacity-80 transition-opacity flex-shrink-0"
             >
-              <div className="bg-blue-600 p-2 rounded-lg">
+              <div className="bg-blue-600 p-2 rounded-lg shadow-[0_0_20px_rgba(37,99,235,0.3)] border border-blue-400/20">
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
               </div>
-              <span className="text-xl font-bold text-slate-900 tracking-tight">CONSENT COP</span>
+              <span className={`text-xl font-black tracking-tighter ${currentPage === 'home' ? 'text-white' : 'text-slate-900'}`}>CONSENTINEL</span>
             </button>
 
             {/* Mobile: Hamburger and Logo on left */}
@@ -97,7 +97,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                     setShowMobileMenu(!showMobileMenu);
                   }
                 }}
-                className={`p-2 text-slate-600 hover:text-blue-600 transition-colors relative w-10 h-10 flex items-center justify-center z-50 ${
+                className={`p-2 transition-colors relative w-10 h-10 flex items-center justify-center z-50 ${
+                  currentPage === 'home' ? 'text-white hover:text-blue-400' : 'text-slate-600 hover:text-blue-600'
+                } ${
                   showMobileMenu ? 'opacity-0 pointer-events-none' : 'opacity-100'
                 }`}
                 aria-label="Toggle menu"
@@ -115,27 +117,27 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                 }} 
                 className="flex items-center space-x-2 hover:opacity-80 transition-opacity flex-shrink-0"
               >
-                <div className="bg-blue-600 p-1.5 rounded-lg">
+                <div className="bg-blue-600 p-1.5 rounded-lg shadow-lg shadow-blue-500/20">
                   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
                 </div>
-                <span className="text-lg font-bold text-slate-900 tracking-tight">CONSENT COP</span>
+                <span className={`text-lg font-bold tracking-tight ${currentPage === 'home' ? 'text-white' : 'text-slate-900'}`}>CONSENTINEL</span>
               </button>
             </div>
             
             {/* Desktop Navigation */}
             <nav className="hidden lg:flex items-center space-x-6">
-              <div className="flex space-x-6 text-sm font-medium text-slate-500">
-                <button onClick={() => onPageChange('enterprise')} className={`hover:text-blue-600 ${currentPage === 'enterprise' ? 'text-blue-600' : ''}`}>Enterprise</button>
-                <button onClick={() => onPageChange('docs')} className={`hover:text-blue-600 ${currentPage === 'docs' ? 'text-blue-600' : ''}`}>Docs</button>
+              <div className={`flex space-x-6 text-sm font-medium ${currentPage === 'home' ? 'text-slate-400 font-mono-technical uppercase tracking-widest' : 'text-slate-500'}`}>
+                <button onClick={() => onPageChange('enterprise')} className={`hover:text-blue-400 transition-colors ${currentPage === 'enterprise' ? 'text-blue-400' : ''}`}>Enterprise</button>
+                <button onClick={() => onPageChange('docs')} className={`hover:text-blue-400 transition-colors ${currentPage === 'docs' ? 'text-blue-400' : ''}`}>Docs</button>
               </div>
               
-              <div className="h-6 w-px bg-slate-200"></div>
+              <div className={`h-6 w-px ${currentPage === 'home' ? 'bg-white/10' : 'bg-slate-200'}`}></div>
 
               {user && (
-                <div className="flex items-center bg-amber-50 px-3 py-1.5 rounded-full border border-amber-200" title={scanCheck.reason || 'Weekly scan allowance'}>
-                  <span className="text-amber-700 text-[10px] font-black uppercase tracking-wider whitespace-nowrap">
+                <div className={`${currentPage === 'home' ? 'bg-blue-500/10 border-blue-500/20' : 'bg-amber-50 border-amber-200'} flex items-center px-3 py-1.5 rounded-full border`} title={scanCheck.reason || 'Weekly scan allowance'}>
+                  <span className={`${currentPage === 'home' ? 'text-blue-300 font-mono-technical' : 'text-amber-700'} text-[10px] font-black uppercase tracking-wider whitespace-nowrap`}>
                     {scanCheck.scansRemaining}/5 scans left
                   </span>
                 </div>
@@ -275,12 +277,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                 }} 
                 className="flex items-center space-x-2 hover:opacity-80 transition-opacity"
               >
-                <div className="bg-blue-600 p-1.5 rounded-lg">
+                <div className="bg-indigo-600 p-1.5 rounded-lg shadow-lg shadow-indigo-500/20">
                   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
                 </div>
-                <span className="text-lg font-bold text-slate-900 tracking-tight">CONSENT COP</span>
+                <span className="text-lg font-bold text-slate-900 tracking-tight">CONSENTINEL</span>
               </button>
               <button
                 onClick={() => {
@@ -318,7 +320,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                 }}
                 className={`w-full text-left px-4 py-3.5 rounded-xl text-base font-medium transition-all ${
                   currentPage === 'enterprise'
-                    ? 'bg-blue-50 text-blue-600'
+                    ? 'bg-indigo-50 text-indigo-600'
                     : 'text-slate-700 hover:bg-slate-50 active:bg-slate-100'
                 }`}
               >
@@ -338,7 +340,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                 }}
                 className={`w-full text-left px-4 py-3.5 rounded-xl text-base font-medium transition-all ${
                   currentPage === 'docs'
-                    ? 'bg-blue-50 text-blue-600'
+                    ? 'bg-indigo-50 text-indigo-600'
                     : 'text-slate-700 hover:bg-slate-50 active:bg-slate-100'
                 }`}
               >
@@ -349,38 +351,38 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
         </div>
       </header>
 
-      <main className={`${currentPage === 'home' ? 'h-[100dvh] overflow-y-auto' : 'flex-grow'}`}>
-        <div className={currentPage === 'home' ? 'h-full w-full' : ''}>
+      <main className={`${currentPage === 'home' ? 'min-h-screen' : 'flex-grow'}`}>
+        <div className={currentPage === 'home' ? 'w-full' : ''}>
           {children}
           {currentPage === 'home' && (
-            <footer className="bg-white border-t border-slate-200 py-8 sm:py-12 lg:py-16">
+            <footer className="bg-black border-t border-white/5 py-8 sm:py-12 lg:py-16">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Mobile: Compact layout with logo and 2-column grid */}
                 <div className="lg:hidden space-y-6">
                   {/* Logo - Mobile only */}
                   <div className="flex items-center space-x-2">
-                    <div className="bg-blue-600 p-1.5 rounded-lg shadow-sm">
+                    <div className="bg-indigo-600 p-1.5 rounded-lg shadow-lg shadow-indigo-500/20">
                       <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                       </svg>
                     </div>
-                    <span className="font-black text-slate-900 tracking-tight text-lg">CONSENT COP</span>
+                    <span className="font-black text-white tracking-tight text-lg">CONSENTINEL</span>
                   </div>
                   
                   {/* 2-column grid for Product and Legal */}
                   <div className="grid grid-cols-2 gap-6">
                     <div>
-                      <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest mb-4">Product</h3>
-                      <ul className="space-y-2.5 text-sm text-slate-500 font-medium">
-                        <li><button onClick={() => onPageChange('enterprise')} className="hover:text-blue-600 transition-colors text-left">Enterprise</button></li>
-                        <li><button onClick={() => onPageChange('docs')} className="hover:text-blue-600 transition-colors text-left">Docs</button></li>
+                      <h3 className="font-black text-white text-xs uppercase tracking-widest mb-4">Product</h3>
+                      <ul className="space-y-2.5 text-sm text-slate-400 font-medium">
+                        <li><button onClick={() => onPageChange('enterprise')} className="hover:text-indigo-400 transition-colors text-left">Enterprise</button></li>
+                        <li><button onClick={() => onPageChange('docs')} className="hover:text-indigo-400 transition-colors text-left">Docs</button></li>
                       </ul>
                     </div>
                     <div>
-                      <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest mb-4">Legal</h3>
-                      <ul className="space-y-2.5 text-sm text-slate-500 font-medium">
-                        <li><button onClick={() => onPageChange('impressum')} className="hover:text-blue-600 transition-colors text-left">Imprint</button></li>
-                        <li><button onClick={() => onPageChange('privacy')} className="hover:text-blue-600 transition-colors text-left">Privacy Policy</button></li>
+                      <h3 className="font-black text-white text-xs uppercase tracking-widest mb-4">Legal</h3>
+                      <ul className="space-y-2.5 text-sm text-slate-400 font-medium">
+                        <li><button onClick={() => onPageChange('impressum')} className="hover:text-indigo-400 transition-colors text-left">Imprint</button></li>
+                        <li><button onClick={() => onPageChange('privacy')} className="hover:text-indigo-400 transition-colors text-left">Privacy Policy</button></li>
                       </ul>
                     </div>
                   </div>
@@ -390,39 +392,39 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
                 <div className="hidden lg:grid grid-cols-4 gap-12">
                   <div className="col-span-2">
                     <div className="flex items-center space-x-2 mb-6">
-                      <div className="bg-blue-600 p-1.5 rounded-lg shadow-sm">
+                      <div className="bg-indigo-600 p-1.5 rounded-lg shadow-lg shadow-indigo-500/20">
                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                         </svg>
                       </div>
-                      <span className="font-black text-slate-900 tracking-tight text-lg">CONSENT COP</span>
+                      <span className="font-black text-white tracking-tight text-lg">CONSENTINEL</span>
                     </div>
-                    <p className="text-slate-500 text-sm max-w-sm leading-relaxed">
-                      The automated DPO assistant for high-growth tech teams. Built in Berlin for the global privacy standard.
+                    <p className="text-slate-400 text-sm max-w-sm leading-relaxed">
+                      The automated compliance auditor for the 2026 data privacy landscape. Built for forensic precision and regulator-grade transparency.
                     </p>
                   </div>
                   <div>
-                    <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest mb-6">Product</h3>
-                    <ul className="space-y-3 text-sm text-slate-500 font-medium">
-                      <li><button onClick={() => onPageChange('enterprise')} className="hover:text-blue-600 transition-colors">Enterprise</button></li>
-                      <li><button onClick={() => onPageChange('docs')} className="hover:text-blue-600 transition-colors">Docs</button></li>
+                    <h3 className="font-black text-white text-xs uppercase tracking-widest mb-6">Product</h3>
+                    <ul className="space-y-3 text-sm text-slate-400 font-medium">
+                      <li><button onClick={() => onPageChange('enterprise')} className="hover:text-indigo-400 transition-colors">Enterprise</button></li>
+                      <li><button onClick={() => onPageChange('docs')} className="hover:text-indigo-400 transition-colors">Docs</button></li>
                     </ul>
                   </div>
                   <div>
-                    <h3 className="font-black text-slate-900 text-xs uppercase tracking-widest mb-6">Legal</h3>
-                    <ul className="space-y-3 text-sm text-slate-500 font-medium">
-                      <li><button onClick={() => onPageChange('impressum')} className="hover:text-blue-600 transition-colors">Imprint</button></li>
-                      <li><button onClick={() => onPageChange('privacy')} className="hover:text-blue-600 transition-colors">Privacy Policy</button></li>
+                    <h3 className="font-black text-white text-xs uppercase tracking-widest mb-6">Legal</h3>
+                    <ul className="space-y-3 text-sm text-slate-400 font-medium">
+                      <li><button onClick={() => onPageChange('impressum')} className="hover:text-indigo-400 transition-colors">Imprint</button></li>
+                      <li><button onClick={() => onPageChange('privacy')} className="hover:text-indigo-400 transition-colors">Privacy Policy</button></li>
                     </ul>
                   </div>
                 </div>
               </div>
               
               {/* Copyright - Mobile optimized */}
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 lg:pt-12 mt-6 sm:mt-8 lg:mt-12 border-t border-slate-100">
-                <div className="flex items-center justify-center sm:justify-start space-x-2 text-slate-400 text-xs sm:text-[10px] font-medium">
-                  <span>© {new Date().getFullYear()} Consent Cop</span>
-                  <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[9px] font-bold">BETA</span>
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 lg:pt-12 mt-6 sm:mt-8 lg:mt-12 border-t border-white/5">
+                <div className="flex items-center justify-center sm:justify-start space-x-2 text-slate-500 text-xs sm:text-[10px] font-medium">
+                  <span>© {new Date().getFullYear()} Consentinel.io</span>
+                  <span className="bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded text-[9px] font-bold">2026 READY</span>
                 </div>
               </div>
             </footer>

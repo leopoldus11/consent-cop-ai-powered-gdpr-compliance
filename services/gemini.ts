@@ -25,7 +25,7 @@ const extractJSON = (text: string): string => {
 const getApiKey = async (): Promise<string> => {
   // First, try to get user's custom API key (BYOK)
   try {
-    const { getCustomApiKey } = await import('./auth.js');
+    const { getCustomApiKey } = await import('./auth');
     const customKey = await getCustomApiKey();
     if (customKey) {
       console.log('[API KEY] Using user-provided BYOK key');

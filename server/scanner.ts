@@ -1,6 +1,7 @@
 // ANTI-BOT DETECTION: Advanced framework to bypass Cloudflare/DataDome
 import { chromium, Browser, Page, BrowserContext } from 'playwright';
 import { createCursor } from 'ghost-cursor';
+import { createHash } from 'crypto';
 import { ScanResult, RequestLog } from '../types.js';
 import { detectTagManagementSystems, extractDataLayers, setupDataLayerProxies, detectConsentManagementSystem, CMS_SIGNATURES, TMS_SIGNATURES } from './detectors.js';
 import { calculateRiskScore, estimateFineRange } from './scoring.js';
@@ -21,6 +22,11 @@ import { setupServiceWorkerCapture, type ServiceWorkerRequest } from './serviceW
 import { setupScriptRewriting } from './scriptRewriter.js';
 import { parseBeaconUrl } from './services/PayloadForensics.js'; // Import Forensic Service
 import { filterSuspects, batchAudit } from './services/BatchAuditor.js'; // Import Batch Auditor
+import { auditGPCConfirmation, auditDeceptiveDesign } from './services/VisionAuditor.js'; // GPC Vision Audit
+import { auditButtonSymmetry, auditRejectionComplexity } from './services/SymmetryAuditor.js'; // UI Symmetry Audit
+import { auditParity, auditGranularity, auditAccessibility } from './services/GDPRAuditor.js'; // GDPR 2026 Module
+import { auditArticle13 } from './services/TransparencyAuditor.js'; // Article 13 Transparency Audit
+import { generateScanSummaryCertificate } from '../services/CertificateGenerator.js'; // Certificate Generator
 /**
  * Delay helper - replaces deprecated page.waitForTimeout()
  */
@@ -140,12 +146,15 @@ export async function scanWebsite(
       ],
     });
 
+    // GPC MODE: Enable Global Privacy Control for 2026 CCPA compliance testing
+    const gpcMode = true; // Set to true to simulate 2026 regulatory bots
+    
     context = await browser.newContext({
       viewport: { width: 1920, height: 1080 },
       userAgent: getRealisticUserAgent(),
       locale: 'en-US',
       timezoneId: 'America/New_York',
-      extraHTTPHeaders: getRealisticHeaders(),
+      extraHTTPHeaders: getRealisticHeaders({ includeGPC: gpcMode }),
       proxy: proxy ? {
         server: `http://${proxy.host}:${proxy.port}`,
         username: proxy.username,
@@ -157,6 +166,7 @@ export async function scanWebsite(
     const page = await context.newPage();
 
     // FIX 1: CDP Override - Hide automation markers at protocol level
+    // NEW: Inject GPC signal for 2026 CCPA compliance testing
     try {
       const client = await context.newCDPSession(page);
       await client.send('Runtime.addBinding', { name: 'chrome' });
@@ -176,9 +186,19 @@ export async function scanWebsite(
               query: async () => ({ state: 'granted' })
             })
           });
+          
+          // GPC 2026: Inject navigator.globalPrivacyControl
+          ${gpcMode ? `
+          Object.defineProperty(navigator, 'globalPrivacyControl', {
+            get: () => true,
+            configurable: false,
+            enumerable: true
+          });
+          console.log('[GPC] Global Privacy Control signal enabled: navigator.globalPrivacyControl =', navigator.globalPrivacyControl);
+          ` : ''}
         `
       });
-      console.log('[CDP] Automation markers hidden via CDP override');
+      console.log(`[CDP] Automation markers hidden via CDP override${gpcMode ? ' + GPC signal injected' : ''}`);
     } catch (error: any) {
       console.warn('[CDP] CDP override failed (non-critical):', error.message);
     }
@@ -304,6 +324,11 @@ export async function scanWebsite(
       fullPage: false
     })) as Buffer;
     const screenshotBeforeBase64 = screenshotBefore.toString('base64');
+    const screenshotBeforeCapturedAt = new Date().toISOString();
+    const screenshotBeforeHash = createHash('sha256').update(screenshotBefore).digest('hex');
+    
+    console.log(`[EVIDENCE] Screenshot BEFORE captured: ${screenshotBeforeCapturedAt}`);
+    console.log(`[EVIDENCE] SHA-256: ${screenshotBeforeHash.substring(0, 16)}...`);
 
     // DEBUG: Log requests captured BEFORE consent click
     console.log(`[DEBUG] Requests captured BEFORE consent click: ${allRequests.length}`);
@@ -379,6 +404,68 @@ export async function scanWebsite(
       fullPage: false
     })) as Buffer;
     const screenshotAfterBase64 = screenshotAfter.toString('base64');
+    const screenshotAfterCapturedAt = new Date().toISOString();
+    const screenshotAfterHash = createHash('sha256').update(screenshotAfter).digest('hex');
+    
+    console.log(`[EVIDENCE] Screenshot AFTER captured: ${screenshotAfterCapturedAt}`);
+    console.log(`[EVIDENCE] SHA-256: ${screenshotAfterHash.substring(0, 16)}...`);
+
+    // 2026 VISION AUDIT: Check for GPC confirmation (CCPA requirement)
+    let gpcAuditResult = null;
+    let symmetryAuditResult = null;
+    
+    if (gpcMode) {
+      console.log('[2026 AUDIT] Running GPC confirmation vision audit...');
+      gpcAuditResult = await auditGPCConfirmation(screenshotBeforeBase64);
+      
+      // Run UI symmetry audit on the consent banner
+      if (bannerExists) {
+        console.log('[2026 AUDIT] Running button symmetry audit...');
+        symmetryAuditResult = await auditButtonSymmetry(page);
+        
+        // Optional: Check rejection complexity
+        const rejectionComplexity = await auditRejectionComplexity(page);
+        console.log('[2026 AUDIT] Rejection complexity:', rejectionComplexity);
+      }
+    }
+
+    // ========== GDPR 2026 AUDIT MODULE ==========
+    // Comprehensive GDPR compliance checks (EDPB Guidelines, Article 7, EAA)
+    let gdprAuditResult = null;
+    
+    if (bannerExists) {
+      console.log('[GDPR 2026] Starting comprehensive GDPR compliance audit...');
+      
+      try {
+        // 1. Parity of Ease: First-layer reject button audit
+        console.log('[GDPR 2026] Auditing first-layer reject button...');
+        const parityResult = await auditParity(page);
+        
+        // 2. Granularity: Toggle analysis (pre-ticked checkboxes)
+        console.log('[GDPR 2026] Auditing consent granularity...');
+        const granularityResult = await auditGranularity(page);
+        
+        // 3. Accessibility: WCAG 2.2 compliance (EAA)
+        console.log('[GDPR 2026] Auditing accessibility (WCAG 2.2)...');
+        const accessibilityResult = await auditAccessibility(page);
+        
+        // 4. Transparency: Article 13 disclosure (EDPB 2026 priority)
+        console.log('[GDPR 2026] Auditing Article 13 transparency...');
+        const transparencyResult = await auditArticle13(screenshotBeforeBase64);
+        
+        gdprAuditResult = {
+          parityOfEase: parityResult,
+          granularity: granularityResult,
+          accessibility: accessibilityResult,
+          transparency: transparencyResult
+        };
+        
+        console.log('[GDPR 2026] ✅ GDPR audit complete');
+        
+      } catch (auditError: any) {
+        console.error(`[GDPR 2026] Audit failed: ${auditError.message}`);
+      }
+    }
 
     // DEBUG: Verify banner is gone in after screenshot
     if (bannerExists && consentClickTimestamp) {
@@ -694,19 +781,46 @@ export async function scanWebsite(
     }
 
     // Process requests into RequestLog format with consentState tagging
+    // GDPR 2026: Now async to support Geo-IP lookups for data residency tracking
     timer.start('networkProcessing');
-    const allRequestLogs = processRequests(requestsBefore, requestsAfter, bannerProvider, consentClickTimestamp);
+    const allRequestLogs = await processRequests(requestsBefore, requestsAfter, bannerProvider, consentClickTimestamp);
     timer.end('networkProcessing');
 
     // Separate violations from compliant requests
     const violations = allRequestLogs.filter(r => r.status === 'violation');
     const compliant = allRequestLogs.filter(r => r.status === 'allowed');
 
-    // Calculate risk score
+    // ========== 2026 VIOLATION DETECTION (BEFORE SCORING) ==========
+    const siteViolations: string[] = [];
+    
+    // GPC VIOLATION: Check if GPC signal was ignored
+    if (gpcMode && gpcAuditResult && !gpcAuditResult.detected) {
+      const preConsentViolations = allRequestLogs.filter(r => r.consentState === 'pre-consent' && r.status === 'violation');
+      if (preConsentViolations.length > 0) {
+        siteViolations.push('GPC_IGNORED: Site did not honor Global Privacy Control signal');
+        console.log('[GPC VIOLATION] Site ignored GPC signal - tracking occurred without confirmation');
+      }
+    }
+
+    // UI BIAS VIOLATION: Check for dark patterns
+    if (symmetryAuditResult && symmetryAuditResult.overallVerdict === 'MAJOR_BIAS') {
+      siteViolations.push('UI_BIAS_DETECTED: Consent interface has biased button design (EDPB violation)');
+      console.log('[UI BIAS] Major bias detected in consent banner design');
+    }
+
+    // GDPR PARITY VIOLATION: Check for first-layer reject button
+    if (gdprAuditResult?.parityOfEase && !gdprAuditResult.parityOfEase.firstLayerRejectVisible) {
+      siteViolations.push('GDPR_PARITY_VIOLATION: No first-layer "Reject All" button (EDPB Guidelines 05/2020)');
+      console.warn('[GDPR VIOLATION] ⚠️  Missing first-layer reject button - automatic +30 risk penalty');
+    }
+
+    // Calculate risk score (includes 2026 violations + GDPR 2026 module)
     const riskScore = calculateRiskScore(
       violations,
       allRequestLogs.length,
-      bannerProvider !== null
+      bannerProvider !== null,
+      siteViolations,
+      gdprAuditResult || undefined
     );
 
     // Estimate fine range
@@ -733,7 +847,11 @@ export async function scanWebsite(
       requests: allRequestLogs,
       screenshots: {
         before: `data:image/png;base64,${screenshotBeforeBase64}`,
+        beforeHash: screenshotBeforeHash,
+        beforeCapturedAt: screenshotBeforeCapturedAt,
         after: `data:image/png;base64,${screenshotAfterBase64}`,
+        afterHash: screenshotAfterHash,
+        afterCapturedAt: screenshotAfterCapturedAt,
       },
       dataLayers,
       tmsDetected,
@@ -759,7 +877,18 @@ export async function scanWebsite(
         detectionAnalysis: metrics.detectionAnalysis,
         geminiAnalysis: metrics.geminiAnalysis,
         networkProcessing: metrics.networkProcessing
-      }
+      },
+      // 2026 Compliance Audits
+      gpcAudit: gpcAuditResult || undefined,
+      symmetryAudit: symmetryAuditResult || undefined,
+      gpcSignalSent: gpcMode,
+      siteViolations: siteViolations.length > 0 ? siteViolations : undefined,
+      // GDPR 2026 Module
+      gdprAudit: gdprAuditResult || undefined,
+      dataResidencyViolations: allRequestLogs
+        .filter(r => r.dataResidency?.adequacyStatus === 'NON_ADEQUATE')
+        .map(r => r.dataResidency!)
+        .filter((v, i, arr) => arr.findIndex(x => x.requestDomain === v.requestDomain) === i), // Deduplicate by domain
     };
 
     // ========== BATCH AUDITOR INTEGRATION ==========
@@ -773,6 +902,15 @@ export async function scanWebsite(
       }
     } catch (auditError: any) {
       console.error(`[BATCH AUDIT] Error during automated audit: ${auditError.message}`);
+    }
+
+    // ========== CERTIFICATE GENERATION ==========
+    // Generate a cryptographically verifiable certificate
+    try {
+      console.log('[CERTIFICATE] Generating legal compliance certificate...');
+      result.certificate = generateScanSummaryCertificate(result);
+    } catch (certError: any) {
+      console.error(`[CERTIFICATE] Generation failed: ${certError.message}`);
     }
 
     return result;
@@ -1094,13 +1232,14 @@ async function tryClickConsentBanner(page: Page): Promise<{ clicked: boolean; ti
 
 /**
  * Process network requests into RequestLog format
+ * GDPR 2026 UPDATE: Now async to support Geo-IP lookups
  */
-function processRequests(
+async function processRequests(
   requestsBefore: NetworkRequest[],
   requestsAfter: NetworkRequest[],
   cmpProvider: string | null,
   consentClickTimestamp: number | null
-): RequestLog[] {
+): Promise<RequestLog[]> {
   console.log(`[PROCESS] Processing ${requestsBefore.length} before + ${requestsAfter.length} after requests`);
   const requestLogs: RequestLog[] = [];
   const processedUrls = new Set<string>();
@@ -1108,8 +1247,8 @@ function processRequests(
   let trackingCount = 0;
 
   // Process pre-consent requests (potential violations)
-  requestsBefore.forEach((req, index) => {
-    if (processedUrls.has(req.url)) return;
+  for (const [index, req] of requestsBefore.entries()) {
+    if (processedUrls.has(req.url)) continue;
     processedUrls.add(req.url);
 
     try {
@@ -1124,13 +1263,13 @@ function processRequests(
       // Skip only the main document
       if (req.resourceType === 'document') {
         skippedCount++;
-        return;
+        continue;
       }
 
       // Skip essential resources if not tracking
       if (isEssentialResource(req.url) && !isTracking) {
         skippedCount++;
-        return;
+        continue;
       }
 
       // IMPROVED: Smarter violation detection
@@ -1149,6 +1288,9 @@ function processRequests(
         !isCMPInitialization &&
         !isStrictlyNecessary;
 
+      // GDPR 2026: Parse beacon with Geo-IP lookup (async)
+      const decodedPayload = isTracking ? await parseBeaconUrl(req.url, `req_${index}`) : undefined;
+
       requestLogs.push({
         id: `req_${index}`,
         domain,
@@ -1159,26 +1301,31 @@ function processRequests(
         dataTypes: inferDataTypes(req.url, req.headers, req.postData),
         parameters: extractParameters(req.url, req.postData),
         consentState: 'pre-consent', // Tagged based on consentClickTimestamp
-        decodedPayload: isTracking ? parseBeaconUrl(req.url, `req_${index}`) : undefined, // FORENSIC INTEGRATION
+        decodedPayload,
+        dataResidency: decodedPayload?.dataResidency, // GDPR 2026: Data residency info
       });
     } catch (error) {
       skippedCount++;
     }
-  });
+  }
 
   console.log(`[PROCESS] Processed ${requestLogs.length} requests, skipped ${skippedCount}, found ${trackingCount} tracking requests`);
 
   // Process post-consent requests (should be allowed)
-  requestsAfter.forEach((req, index) => {
-    if (processedUrls.has(req.url)) return;
+  for (const [index, req] of requestsAfter.entries()) {
+    if (processedUrls.has(req.url)) continue;
     processedUrls.add(req.url);
 
     try {
       const domain = new URL(req.url).hostname;
 
       if (req.resourceType === 'document' || isEssentialResource(req.url)) {
-        return;
+        continue;
       }
+
+      // GDPR 2026: Parse beacon with Geo-IP lookup (async)
+      const isTracking = isTrackingRequest(req.url, domain);
+      const decodedPayload = isTracking ? await parseBeaconUrl(req.url, `req_after_${index}`) : undefined;
 
       requestLogs.push({
         id: `req_after_${index}`,
@@ -1190,12 +1337,13 @@ function processRequests(
         dataTypes: inferDataTypes(req.url, req.headers, req.postData),
         parameters: extractParameters(req.url, req.postData),
         consentState: 'post-consent', // Tagged based on consentClickTimestamp
-        decodedPayload: isTrackingRequest(req.url, domain) ? parseBeaconUrl(req.url, `req_after_${index}`) : undefined, // FORENSIC INTEGRATION
+        decodedPayload,
+        dataResidency: decodedPayload?.dataResidency, // GDPR 2026: Data residency info
       });
     } catch (error) {
       // Skip invalid URLs
     }
-  });
+  }
 
   return requestLogs;
 }

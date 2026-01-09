@@ -1,6 +1,7 @@
 
-import { BeaconType, ParsedBeacon, ParameterInfo, ParameterCategory } from '../../types';
+import { BeaconType, ParsedBeacon, ParameterInfo, ParameterCategory, DataResidencyInfo } from '../../types';
 import { PARAM_MAP } from './ForensicConstants';
+import { getAdequacyStatus, isEEACountry } from './DataResidencyConstants.js';
 
 const deepDecode = (str: string): string => {
     let prev = '';
@@ -18,7 +19,196 @@ const deepDecode = (str: string): string => {
     return curr;
 };
 
-export const parseBeaconUrl = (url: string, id: string): ParsedBeacon => {
+/**
+ * GDPR 2026: Geo-IP Lookup for Data Residency Tracking
+ * 
+ * Strategy:
+ * 1. First check static known vendor database (instant, free)
+ * 2. Fall back to ip-api.com (supports domains, 45 req/min free)
+ * 
+ * Tracks cross-border data transfers under Article 44-49 GDPR
+ */
+const geoIPCache = new Map<string, DataResidencyInfo>();
+
+// Known tracking vendor headquarters (reduces API calls, improves accuracy)
+const KNOWN_VENDOR_RESIDENCY: Record<string, { country: string; countryCode: string }> = {
+    // Google (US)
+    'google-analytics.com': { country: 'United States', countryCode: 'US' },
+    'googletagmanager.com': { country: 'United States', countryCode: 'US' },
+    'googleadservices.com': { country: 'United States', countryCode: 'US' },
+    'doubleclick.net': { country: 'United States', countryCode: 'US' },
+    'google.com': { country: 'United States', countryCode: 'US' },
+    'google.de': { country: 'United States', countryCode: 'US' }, // Still US HQ
+    
+    // Meta (US/Ireland)
+    'facebook.com': { country: 'United States', countryCode: 'US' },
+    'facebook.net': { country: 'United States', countryCode: 'US' },
+    'fbcdn.net': { country: 'United States', countryCode: 'US' },
+    
+    // Adobe (US)
+    'demdex.net': { country: 'United States', countryCode: 'US' },
+    'omtrdc.net': { country: 'United States', countryCode: 'US' },
+    'adobedtm.com': { country: 'United States', countryCode: 'US' },
+    '2o7.net': { country: 'United States', countryCode: 'US' },
+    
+    // TikTok (China/Singapore)
+    'tiktok.com': { country: 'China', countryCode: 'CN' },
+    'tiktokw.us': { country: 'United States', countryCode: 'US' },
+    'byteoversea.com': { country: 'Singapore', countryCode: 'SG' },
+    
+    // Microsoft/Bing (US)
+    'bing.com': { country: 'United States', countryCode: 'US' },
+    'clarity.ms': { country: 'United States', countryCode: 'US' },
+    
+    // Criteo (France - EU!)
+    'criteo.com': { country: 'France', countryCode: 'FR' },
+    'criteo.net': { country: 'France', countryCode: 'FR' },
+    
+    // Trade Desk (US)
+    'adsrvr.org': { country: 'United States', countryCode: 'US' },
+    
+    // AppNexus/Xandr (US)
+    'adnxs.com': { country: 'United States', countryCode: 'US' },
+    
+    // Teads (France - EU!)
+    'teads.tv': { country: 'France', countryCode: 'FR' },
+    
+    // Rubicon (US)
+    'rubiconproject.com': { country: 'United States', countryCode: 'US' },
+    
+    // Sojern (US)
+    'sojern.com': { country: 'United States', countryCode: 'US' },
+    
+    // Pinterest (US)
+    'pinimg.com': { country: 'United States', countryCode: 'US' },
+    
+    // Usercentrics (Germany - EU!)
+    'usercentrics.eu': { country: 'Germany', countryCode: 'DE' },
+    'usercentrics.com': { country: 'Germany', countryCode: 'DE' },
+    
+    // Cloudfront (US)
+    'cloudfront.net': { country: 'United States', countryCode: 'US' },
+    
+    // Contentstack (US)
+    'contentstack.com': { country: 'United States', countryCode: 'US' },
+    
+    // SmartSeer
+    'smartseer.com': { country: 'United States', countryCode: 'US' },
+    
+    // AdUp (Germany - EU!)
+    'adup-tech.com': { country: 'Germany', countryCode: 'DE' },
+    
+    // Roeye/Lantern
+    'roeye.com': { country: 'United Kingdom', countryCode: 'GB' },
+    'roeyecdn.com': { country: 'United Kingdom', countryCode: 'GB' },
+    
+    // AGKN
+    'agkn.com': { country: 'United States', countryCode: 'US' },
+};
+
+function getKnownVendorResidency(domain: string): { country: string; countryCode: string } | null {
+    // Check exact match first
+    if (KNOWN_VENDOR_RESIDENCY[domain]) {
+        return KNOWN_VENDOR_RESIDENCY[domain];
+    }
+    
+    // Check parent domains (e.g., metrics.dertour.de should match dertour.de)
+    const parts = domain.split('.');
+    for (let i = 1; i < parts.length - 1; i++) {
+        const parentDomain = parts.slice(i).join('.');
+        if (KNOWN_VENDOR_RESIDENCY[parentDomain]) {
+            return KNOWN_VENDOR_RESIDENCY[parentDomain];
+        }
+    }
+    
+    return null;
+}
+
+async function lookupDataResidency(domain: string): Promise<DataResidencyInfo> {
+    // Check cache first
+    if (geoIPCache.has(domain)) {
+        return geoIPCache.get(domain)!;
+    }
+
+    // Step 1: Check known vendor database (instant, free)
+    const knownVendor = getKnownVendorResidency(domain);
+    if (knownVendor) {
+        const isEEA = isEEACountry(knownVendor.countryCode);
+        const adequacyStatus = getAdequacyStatus(knownVendor.countryCode);
+        
+        const result: DataResidencyInfo = {
+            requestDomain: domain,
+            country: knownVendor.country,
+            countryCode: knownVendor.countryCode,
+            isEEA,
+            adequacyStatus
+        };
+        
+        geoIPCache.set(domain, result);
+        console.log(`[GEO-IP] ${domain} -> ${result.country} (${result.countryCode}) [${result.adequacyStatus}] [KNOWN_VENDOR]`);
+        return result;
+    }
+
+    // Step 2: Fall back to ip-api.com (supports domains directly)
+    try {
+        console.log(`[GEO-IP] Looking up data residency for: ${domain}`);
+        
+        // ip-api.com supports domain names directly and has higher rate limits
+        const response = await fetch(`http://ip-api.com/json/${domain}?fields=status,message,country,countryCode,query`, {
+            headers: {
+                'User-Agent': 'Consentinel-GDPR-Auditor/2.0'
+            },
+            signal: AbortSignal.timeout(3000) // 3s timeout
+        });
+
+        if (!response.ok) {
+            throw new Error(`API returned ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Handle API errors
+        if (data.status === 'fail') {
+            throw new Error(data.message || 'API error');
+        }
+
+        const countryCode = data.countryCode || '';
+        const isEEA = isEEACountry(countryCode);
+        const adequacyStatus = getAdequacyStatus(countryCode);
+
+        const result: DataResidencyInfo = {
+            requestDomain: domain,
+            resolvedIP: data.query,
+            country: data.country,
+            countryCode,
+            isEEA,
+            adequacyStatus
+        };
+
+        // Cache result
+        geoIPCache.set(domain, result);
+        
+        console.log(`[GEO-IP] ${domain} -> ${result.country} (${result.countryCode}) [${result.adequacyStatus}]`);
+        return result;
+
+    } catch (error: any) {
+        console.warn(`[GEO-IP] Lookup failed for ${domain}: ${error.message}`);
+        
+        // Return unknown status on failure
+        const fallback: DataResidencyInfo = {
+            requestDomain: domain,
+            isEEA: false,
+            adequacyStatus: 'UNKNOWN'
+        };
+        
+        // Cache fallback to avoid repeated failures
+        geoIPCache.set(domain, fallback);
+        return fallback;
+    }
+}
+
+
+export const parseBeaconUrl = async (url: string, id: string): Promise<ParsedBeacon> => {
     if (!url || url.trim() === '') {
         return { id, type: BeaconType.UNKNOWN, rawUrl: '', parameters: [], errors: [] };
     }
@@ -117,7 +307,18 @@ export const parseBeaconUrl = (url: string, id: string): ParsedBeacon => {
 
     params.sort((a, b) => a.category.localeCompare(b.category));
 
-    return { id, type, rawUrl: url, parameters: params, errors };
+    // GDPR 2026: Geo-IP lookup for data residency tracking
+    let dataResidency: DataResidencyInfo | undefined;
+    try {
+        const urlObj = new URL(url);
+        const domain = urlObj.hostname;
+        dataResidency = await lookupDataResidency(domain);
+    } catch (error) {
+        // If URL parsing fails or lookup fails, skip data residency
+        console.warn('[GEO-IP] Skipping data residency for invalid URL');
+    }
+
+    return { id, type, rawUrl: url, parameters: params, errors, dataResidency };
 };
 
 const detectType = (url: string): BeaconType => {
